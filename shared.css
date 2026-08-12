@@ -1,0 +1,999 @@
+/* =========================================================================
+   Shared design system for the Dilution Toolkit
+   Used by index.html, dilution.html, stock-solution.html, plate-map.html, msd-plate.html
+   ========================================================================= */
+
+:root {
+  /* Muted, mostly-monochrome accent palette — used sparingly for text links,
+     borders, and focus rings, never as large solid fills (see the "plain
+     bordered lab-software grid" aesthetic in CLAUDE.md). */
+  --blue-900: #23414f;
+  --blue-700: #3d6478;
+  --blue-600: #4a7690;
+  --blue-100: #eef2f4;
+  --teal-500: #4f8c85;
+  --teal-600: #446f6a;
+  --ink: #1f2933;
+  --muted: #5b6b76;
+  --border: #d7e0e6;
+  --bg: #f4f7f9;
+  --card: #ffffff;
+  --error-bg: #fdecec;
+  --error-border: #e6a4a4;
+  --error-text: #9c2b2b;
+  --ok-bg: #eaf7f0;
+  --ok-border: #a9dcc0;
+  --warn-bg: #fff8e6;
+  --warn-border: #e8c468;
+  --warn-text: #8a6300;
+  --radius: 10px;
+}
+
+/* Dark palette — same hues, inverted for contrast. Applied via data-theme
+   attribute on <html>, set as early as possible (inline head script) to
+   avoid a flash of the wrong theme. */
+:root[data-theme="dark"] {
+  --blue-900: #d7e2e8;
+  --blue-700: #8fb3c4;
+  --blue-600: #7095a8;
+  --blue-100: #1b2b33;
+  --teal-500: #5fa89c;
+  --teal-600: #4c8d82;
+  --ink: #e6edf2;
+  --muted: #93a4b0;
+  --border: #2c3e4a;
+  --bg: #0b1620;
+  --card: #111f2b;
+  --error-bg: #3a1414;
+  --error-border: #7a3232;
+  --error-text: #f4a3a3;
+  --ok-bg: #0f2a1e;
+  --ok-border: #2f6b4a;
+  --warn-bg: #332608;
+  --warn-border: #6b5323;
+  --warn-text: #e8c468;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  background: var(--bg);
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  line-height: 1.5;
+  transition: background 0.15s, color 0.15s;
+}
+
+.wrap {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 24px 16px 64px;
+}
+
+header.page-header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+header.page-header h1 {
+  font-size: 1.6rem;
+  margin: 0 0 6px;
+  color: var(--blue-900);
+  letter-spacing: -0.01em;
+}
+
+header.page-header p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+/* ---------------------------- Nav bar ---------------------------- */
+
+.navbar {
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+}
+
+.nav-inner {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.nav-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  color: var(--blue-900);
+  text-decoration: none;
+  font-size: 1.05rem;
+}
+
+.brand-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  background: var(--teal-500);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.nav-links a {
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 8px 12px;
+  border-radius: 7px;
+  transition: background 0.15s, color 0.15s;
+}
+
+.nav-links a:hover {
+  background: var(--bg);
+  color: var(--ink);
+}
+
+.nav-links a[aria-current="page"] {
+  background: var(--ink);
+  color: var(--card);
+}
+
+.theme-toggle {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 8px 14px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--blue-700);
+  transition: background 0.15s;
+}
+
+.theme-toggle:hover {
+  background: var(--blue-100);
+}
+
+@media (max-width: 640px) {
+  .nav-inner { justify-content: center; }
+  .nav-links { justify-content: center; }
+}
+
+/* ---------------------------- Tabs / panels ---------------------------- */
+
+.tabs, .mode-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 18px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 4px;
+}
+
+.tab {
+  flex: 1;
+  padding: 10px 12px;
+  border: none;
+  background: transparent;
+  border-radius: 7px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.tab.active {
+  background: var(--ink);
+  color: var(--card);
+}
+
+.panel {
+  display: none;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 22px;
+}
+
+.panel.active {
+  display: block;
+}
+
+h2 {
+  font-size: 1.15rem;
+  margin: 0 0 4px;
+  color: var(--blue-900);
+}
+
+.panel-sub {
+  margin: 0 0 20px;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+/* ---------------------------- Form fields ---------------------------- */
+
+.field-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+input[type="number"], input[type="text"], select {
+  font-size: 0.95rem;
+  padding: 10px 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--card);
+  color: var(--ink);
+  font-family: inherit;
+}
+
+input[type="number"], input[type="text"] {
+  width: 100%;
+}
+
+select {
+  min-width: 92px;
+}
+
+input[type="file"] {
+  font-size: 0.88rem;
+  color: var(--ink);
+  width: 100%;
+  padding: 8px 0;
+}
+
+input[type="file"]::file-selector-button {
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 8px 14px;
+  margin-right: 12px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--blue-700);
+  cursor: pointer;
+}
+
+input[type="file"]::file-selector-button:hover {
+  background: var(--blue-100);
+}
+
+input:focus, select:focus {
+  outline: none;
+  border-color: var(--blue-600);
+  box-shadow: 0 0 0 3px rgba(74, 118, 144, 0.18);
+}
+
+.hint {
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin-top: -8px;
+  margin-bottom: 16px;
+}
+
+/* ---------------------------- Buttons ---------------------------- */
+
+.btn-row {
+  display: flex;
+  gap: 10px;
+  margin-top: 22px;
+  flex-wrap: wrap;
+}
+
+button.primary {
+  background: var(--ink);
+  color: var(--card);
+  border: 1px solid var(--ink);
+  padding: 11px 20px;
+  border-radius: 7px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+button.primary:hover {
+  opacity: 0.82;
+}
+
+button.secondary {
+  background: transparent;
+  color: var(--blue-700);
+  border: 1px solid var(--border);
+  padding: 11px 20px;
+  border-radius: 7px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+button.secondary:hover {
+  background: var(--bg);
+}
+
+button.btn-icon {
+  background: transparent;
+  color: var(--blue-700);
+  border: 1px solid var(--border);
+  padding: 9px 14px;
+  border-radius: 7px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+button.btn-icon:hover {
+  background: var(--bg);
+}
+
+/* ---------------------------- Message boxes ---------------------------- */
+
+.error-box, .warn-box {
+  display: none;
+  margin-top: 18px;
+  padding: 12px 14px;
+  border-radius: 7px;
+  font-size: 0.9rem;
+}
+
+.error-box {
+  background: var(--error-bg);
+  border: 1px solid var(--error-border);
+  color: var(--error-text);
+}
+
+.warn-box {
+  background: var(--warn-bg);
+  border: 1px solid var(--warn-border);
+  color: var(--warn-text);
+}
+
+.error-box.show, .warn-box.show {
+  display: block;
+}
+
+.warn-box ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+
+.result-box {
+  display: none;
+  margin-top: 18px;
+  background: var(--ok-bg);
+  border: 1px solid var(--ok-border);
+  border-radius: 8px;
+  padding: 16px 18px;
+}
+
+.result-box.show {
+  display: block;
+}
+
+.result-box h3 {
+  margin: 0 0 10px;
+  font-size: 1rem;
+  color: var(--blue-900);
+}
+
+.result-line {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px dashed var(--ok-border);
+  font-size: 0.95rem;
+  gap: 12px;
+}
+
+.result-line:last-child {
+  border-bottom: none;
+}
+
+.result-line .value {
+  font-weight: 700;
+  color: var(--blue-900);
+  text-align: right;
+}
+
+.result-box .stage-label {
+  font-weight: 700;
+  color: var(--blue-900);
+  margin: 14px 0 4px;
+  font-size: 0.9rem;
+}
+
+.result-box .stage-label:first-of-type {
+  margin-top: 0;
+}
+
+/* ---------------------------- Tables ---------------------------- */
+
+.table-scroll {
+  margin-top: 18px;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 480px;
+}
+
+thead th {
+  background: var(--bg);
+  color: var(--ink);
+  text-align: left;
+  padding: 10px 12px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  white-space: nowrap;
+  border-bottom: 2px solid var(--border);
+}
+
+tbody td {
+  padding: 10px 12px;
+  font-size: 0.9rem;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+tbody tr:nth-child(even) {
+  background: var(--bg);
+}
+
+tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* ---------------------------- Chart ---------------------------- */
+
+.chart-container {
+  margin-top: 18px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  background: var(--card);
+}
+
+.chart-container svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.chart-container .chart-empty {
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.85rem;
+  padding: 24px 0;
+}
+
+/* ---------------------------- Checkbox field ---------------------------- */
+
+.checkbox-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.checkbox-field input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--teal-500);
+  cursor: pointer;
+}
+
+.checkbox-field label {
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+/* ---------------------------- Plate map ---------------------------- */
+/* Plain bordered-cell grid: thin borders, no solid colour fills. Wells size
+   to their content (no fixed aspect-ratio) so every line of text — well ID,
+   sample/standard label, full concentration with unit — stays fully visible
+   with no truncation/ellipsis; text wraps instead of clipping. The grid
+   grows accordingly and relies on .plate-scroll's horizontal scroll on
+   narrow screens rather than squeezing cells down. */
+
+.plate-scroll {
+  margin-top: 18px;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+}
+
+.plate-grid {
+  display: inline-grid;
+  gap: 4px;
+  padding: 14px;
+}
+
+.plate-corner {
+  /* blank top-left header cell */
+}
+
+.plate-col-label,
+.plate-row-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+/* Freeform row/column label inputs — always editable, styled to blend in as
+   plain text until hovered/focused so the header row still reads as a plain
+   grid header by default. Defaults to the plate coordinate (A, B, ... / 1,
+   2, ...) via the input's value, so nothing looks different until a user
+   actually types over it. */
+.plate-label-input {
+  width: 100%;
+  min-width: 0;
+  text-align: center;
+  font: inherit;
+  font-size: inherit;
+  font-weight: 700;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 3px 2px;
+}
+
+.plate-label-input:hover {
+  border-color: var(--border);
+}
+
+.plate-label-input:focus {
+  outline: none;
+  border-color: var(--blue-600);
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: 0 0 0 2px rgba(74, 118, 144, 0.15);
+}
+
+/* Wells are plain divs, not buttons — a well can hold an editable note
+   textarea (below), and nesting an <input>/<textarea> inside a <button> is
+   invalid HTML. Column width is fixed in JS (grid-template-columns, per
+   render function) rather than the old minmax(_, 1fr), so every column in
+   the grid is exactly the same width regardless of content — the fix for
+   cells looking unevenly sized/"jumbled" when content length varies a lot
+   (e.g. a one-word standard label next to a long MLR treatment note). */
+.well {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card);
+  cursor: default;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 3px;
+  font-size: 0.74rem;
+  line-height: 1.25;
+  padding: 8px 6px;
+  min-height: 76px;
+  color: var(--ink);
+  text-align: center;
+  white-space: normal;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  transition: border-color 0.1s, background 0.1s;
+}
+
+/* Plate Map Generator only: wells there are still click-to-toggle-blank
+   (see plate-map.html's renderPlateGrid), so only that page's wells get the
+   pointer cursor back. */
+.well.clickable {
+  cursor: pointer;
+}
+
+.well:hover {
+  border-color: var(--blue-600);
+  z-index: 1;
+  position: relative;
+}
+
+.well .well-id {
+  font-weight: 700;
+  font-size: 0.66rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.well .well-label {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.well .well-conc {
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+
+/* Freeform per-well note — a blank-canvas annotation independent of (and
+   additive to) whatever computed value the well already shows, so a plate
+   plan can be hand-annotated the way a wet-lab MLR plan sheet is (e.g.
+   a treatment ratio or dosing note). Auto-sized to its content by
+   the page's autoSizeWellNote() helper, so it never internally scrolls.
+   Blends in like the row/column label inputs — no visible box until
+   hovered/focused — and always has room to grow since .well no longer
+   forces a fixed height. */
+.well-note {
+  width: 100%;
+  min-height: 1.2em;
+  margin-top: 2px;
+  resize: none;
+  overflow: hidden;
+  font: inherit;
+  font-size: 0.68rem;
+  line-height: 1.25;
+  text-align: center;
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 2px 3px;
+}
+
+.well-note::placeholder {
+  color: var(--muted);
+  opacity: 0.6;
+}
+
+.well-note:hover {
+  border-color: var(--border);
+}
+
+.well-note:focus {
+  outline: none;
+  border-color: var(--blue-600);
+  background: var(--card);
+  box-shadow: 0 0 0 2px rgba(74, 118, 144, 0.15);
+}
+
+/* Dashed/faint treatment for a genuinely-unused well. If the well carries a
+   custom note, the render functions below deliberately withhold this class —
+   an annotated well is no longer "empty" from the plan's point of view, even
+   though nothing was computed for it, so it should read as a normal cell. */
+.well.state-empty {
+  background: transparent;
+  border-style: dashed;
+  opacity: 0.6;
+}
+
+.well.is-blank {
+  background-image: repeating-linear-gradient(
+    45deg,
+    var(--border),
+    var(--border) 4px,
+    transparent 4px,
+    transparent 8px
+  );
+  background-color: var(--card);
+  opacity: 1;
+}
+
+.plate-grid[data-format="384"] .well {
+  font-size: 0.64rem;
+  min-height: 58px;
+  padding: 5px 3px;
+}
+
+.plate-grid[data-format="384"] .well .well-conc {
+  font-size: 0.6rem;
+}
+
+.plate-grid[data-format="384"] .well-note {
+  font-size: 0.6rem;
+}
+
+.plate-legend {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+  font-size: 0.8rem;
+  color: var(--muted);
+  flex-wrap: wrap;
+}
+
+/* ---------------------------- MSD plate (categorical well types) ---------------------------- */
+/* No fill colour at all — standard/sample/blank/empty are told apart purely
+   by border style and the well's own text content (S1.."S7" vs a sample
+   name vs "Blank"), matching the plain bordered-table look with zero colour
+   blocks. (A colour tint was tried here and on plate-map's concentration
+   shading; it read as a hard-to-see solid fill rather than a subtle cue —
+   removed rather than tuned further.) */
+
+.type-legend {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 14px;
+  font-size: 0.8rem;
+  color: var(--muted);
+  flex-wrap: wrap;
+}
+
+.type-legend .legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.type-legend .legend-swatch {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.type-legend .legend-swatch.is-blank {
+  background-image: repeating-linear-gradient(45deg, var(--border), var(--border) 3px, transparent 3px, transparent 6px);
+  background-color: var(--card);
+}
+.type-legend .legend-swatch.state-empty {
+  background: transparent;
+  border-style: dashed;
+}
+
+/* ---------------------------- History panel ---------------------------- */
+
+.history-panel {
+  margin-top: 24px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 22px;
+}
+
+.history-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.history-panel-head h2 {
+  margin: 0;
+}
+
+.history-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.history-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 10px 12px;
+  font-size: 0.85rem;
+  color: var(--ink);
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.history-item:hover {
+  background: var(--bg);
+}
+
+.history-item .ts {
+  color: var(--muted);
+  font-size: 0.78rem;
+  margin-left: 8px;
+}
+
+.history-empty {
+  color: var(--muted);
+  font-size: 0.85rem;
+  padding: 6px 0;
+}
+
+/* ---------------------------- Home page ---------------------------- */
+
+.wrap-top {
+  padding-top: 48px;
+}
+
+.tool-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+  margin-bottom: 36px;
+}
+
+.tool-card {
+  display: block;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 22px;
+  text-decoration: none;
+  color: inherit;
+  transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
+}
+
+.tool-card:hover {
+  border-color: var(--blue-600);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
+}
+
+.tool-card .tool-kicker {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--teal-500);
+  margin-bottom: 10px;
+}
+
+.tool-card h3 {
+  margin: 0 0 6px;
+  font-size: 1.1rem;
+  color: var(--blue-900);
+}
+
+.tool-card p {
+  margin: 0 0 10px;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.tool-card .tool-cta {
+  color: var(--teal-500);
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.section-heading {
+  text-align: center;
+  margin: 0 0 6px;
+  color: var(--blue-900);
+  font-size: 1.15rem;
+}
+
+.section-sub {
+  text-align: center;
+  margin: 0 0 20px;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.feature-icon {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px 12px;
+  text-align: center;
+}
+
+.feature-icon .badge {
+  display: inline-block;
+  background: var(--blue-100);
+  color: var(--blue-700);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  padding: 4px 10px;
+  border-radius: 999px;
+  margin-bottom: 10px;
+}
+
+.feature-icon .label {
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--ink);
+  display: block;
+  margin-bottom: 4px;
+}
+
+.feature-icon .desc {
+  font-size: 0.76rem;
+  color: var(--muted);
+}
+
+footer.page-footer {
+  text-align: center;
+  margin-top: 28px;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+/* ---------------------------- Responsive ---------------------------- */
+
+@media (max-width: 520px) {
+  .field-row {
+    grid-template-columns: 1fr;
+  }
+  select {
+    width: 100%;
+  }
+  .panel {
+    padding: 16px;
+  }
+  .history-panel-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .wrap-top {
+    padding-top: 28px;
+  }
+}

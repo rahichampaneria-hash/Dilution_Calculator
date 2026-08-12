@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MSD Plate Planner</title>
+<link rel="stylesheet" href="shared.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🧪</text></svg>">
+<script>
+// Applied before first paint to avoid a flash of the wrong theme.
+(function() {
+  try {
+    var t = localStorage.getItem('dilutionToolkit.theme');
+    if (!t) {
+      t = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+    }
+    document.documentElement.setAttribute('data-theme', t);
+  } catch (e) {}
+})();
+</script>
+</head>
+<body>
+<header class="navbar">
+  <div class="nav-inner">
+    <a class="nav-brand" href="index.html"><span class="brand-mark">DT</span> Dilution Toolkit</a>
+    <nav class="nav-links">
+      <a href="index.html">Home</a>
+      <a href="dilution.html">Dilution Calculator</a>
+      <a href="stock-solution.html">Stock Solution Planner</a>
+      <a href="plate-map.html">Plate Map Generator</a>
+      <a href="msd-plate.html" aria-current="page">MSD Plate Planner</a>
+    </nav>
+    <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Toggle dark mode">Dark</button>
+  </div>
+</header>
+
+<div class="wrap">
+  <header class="page-header">
+    <h1>MSD Plate Planner</h1>
+    <p>Lay out an MSD (Meso Scale Discovery) 96-well plate: a standard curve plus uploaded samples (CSV or Excel), following conventional MSD assay setup, with freeform well/row/column labels and CSV export.</p>
+  </header>
+
+  <section class="panel active">
+    <h2>Standard curve</h2>
+    <p class="panel-sub">Defaults match the conventional MSD setup: a 7-point, 4-fold serial-diluted curve plus a zero calibrator, run in duplicate down rows A–H in columns 1–2. Every value here is editable.</p>
+
+    <div class="field-row" style="grid-template-columns:1fr 1fr;">
+      <div class="field">
+        <label for="msd-numstd">Number of standard points</label>
+        <input type="number" id="msd-numstd" value="7" step="1" min="1">
+      </div>
+      <div class="field">
+        <label for="msd-factor">Dilution factor</label>
+        <input type="number" id="msd-factor" value="4" step="any" min="1">
+      </div>
+    </div>
+
+    <div class="field-row">
+      <div class="field">
+        <label for="msd-topcal">Top calibrator concentration</label>
+        <input type="number" id="msd-topcal" value="10000" step="any" min="0">
+      </div>
+      <div class="field">
+        <label for="msd-topcal-unit">Unit</label>
+        <select id="msd-topcal-unit">
+          <option value="nM">nM</option>
+          <option value="µM">µM</option>
+          <option value="mM">mM</option>
+          <option value="M">M</option>
+          <option value="ng/mL">ng/mL</option>
+          <option value="µg/mL">µg/mL</option>
+          <option value="mg/mL">mg/mL</option>
+          <option value="pg/mL" selected>pg/mL</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="checkbox-field">
+      <input type="checkbox" id="msd-blank" checked>
+      <label for="msd-blank">Include a zero/blank calibrator</label>
+    </div>
+
+    <div class="field-row" style="grid-template-columns:1fr 1fr;">
+      <div class="field">
+        <label for="msd-standardstartcol">Standard start column</label>
+        <input type="number" id="msd-standardstartcol" value="1" step="1" min="1">
+      </div>
+      <div class="field">
+        <label for="msd-stdrep">Standard replicates (columns)</label>
+        <input type="number" id="msd-stdrep" value="2" step="1" min="1">
+      </div>
+    </div>
+
+    <div class="field-row" style="grid-template-columns:1fr;">
+      <div class="field">
+        <label for="msd-samplestartcol">Sample start column</label>
+        <input type="number" id="msd-samplestartcol" value="3" step="1" min="1">
+      </div>
+    </div>
+
+    <p class="hint">Sample start column defaults to just after the standard block, and updates automatically when you change the standard start column or replicate count — unless you edit it yourself. Standards and samples must not overlap.</p>
+
+    <h2>Samples</h2>
+    <p class="panel-sub">Upload a CSV or Excel (.xlsx/.xls) file with sample names and concentrations. Columns: SampleName, Concentration, Unit (a header row and blank lines are fine; Unit is optional and falls back to the top calibrator's unit). Excel files are read entirely in your browser — nothing is uploaded anywhere.</p>
+
+    <div class="field-row" style="grid-template-columns:1fr;">
+      <div class="field">
+        <label for="msd-file">Sample file (CSV or Excel)</label>
+        <input type="file" id="msd-file" accept=".csv,text/csv,.xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel">
+      </div>
+    </div>
+
+    <button class="btn-icon" type="button" id="msd-advanced-toggle">Advanced: pick sheet &amp; columns</button>
+
+    <div id="msd-advanced-panel" style="display:none; margin-top:14px;">
+      <p class="hint" style="margin-top:0;">Use this when your samples live on one sheet of a larger workbook, or the columns aren't in SampleName/Concentration/Unit order — pick the worksheet and column letters below (read them off the preview), then Generate as usual.</p>
+
+      <div class="field-row" style="grid-template-columns:1fr; display:none;" id="msd-sheet-row">
+        <div class="field">
+          <label for="msd-sheet">Worksheet</label>
+          <select id="msd-sheet"></select>
+        </div>
+      </div>
+
+      <div class="table-scroll" id="msd-preview-wrap" style="display:none;">
+        <table id="msd-preview-table"></table>
+      </div>
+
+      <div class="field-row" style="grid-template-columns:1fr;">
+        <div class="field">
+          <label for="msd-skiprows">Skip this many rows at the top (header row, or anything else before the real data starts)</label>
+          <input type="number" id="msd-skiprows" value="1" step="1" min="0">
+        </div>
+      </div>
+
+      <div class="field-row" style="grid-template-columns:1fr 1fr 1fr;">
+        <div class="field">
+          <label for="msd-col-name">Sample name column</label>
+          <input type="text" id="msd-col-name" placeholder="e.g. A" maxlength="3" value="A">
+        </div>
+        <div class="field">
+          <label for="msd-col-conc">Concentration column</label>
+          <input type="text" id="msd-col-conc" placeholder="e.g. B" maxlength="3" value="B">
+        </div>
+        <div class="field">
+          <label for="msd-col-unit">Unit column (optional)</label>
+          <input type="text" id="msd-col-unit" placeholder="e.g. C" maxlength="3" value="C">
+        </div>
+      </div>
+    </div>
+
+    <div class="field-row" style="grid-template-columns:1fr 1fr; margin-top:16px;">
+      <div class="field">
+        <label for="msd-samplerep">Sample replicates</label>
+        <input type="number" id="msd-samplerep" value="2" step="1" min="1">
+      </div>
+      <div class="field" style="justify-content:flex-end;">
+        <button class="btn-icon" type="button" id="msd-download-template">Download example CSV template</button>
+      </div>
+    </div>
+
+    <p class="hint">Samples fill left-to-right then top-to-bottom from the start column, in adjacent-well replicate blocks, across all 8 rows. Leaving the file empty previews the standard curve alone.</p>
+
+    <div class="btn-row">
+      <button class="primary" type="button" id="msd-generate">Generate</button>
+      <button class="secondary" type="button" id="msd-reset">Reset</button>
+      <button class="btn-icon" type="button" id="msd-export-csv">Export CSV</button>
+      <button class="btn-icon" type="button" id="msd-share">Copy link</button>
+    </div>
+    <p class="hint" id="msd-share-url"></p>
+    <p class="hint">Shareable links reproduce the standard curve setup only — the uploaded sample file isn't included and needs to be re-attached.</p>
+
+    <div class="error-box" id="msd-error"></div>
+
+    <p class="hint">Row/column headers and each individual well are editable — click a header to relabel a row or column (e.g. "TA3"), or click a well's "Note…" line to annotate it directly, so you can plan a general layout (donor pairings, treatment ratios) beyond just this standard curve.</p>
+
+    <div class="plate-scroll">
+      <div class="plate-grid" id="msd-grid"></div>
+    </div>
+    <div class="type-legend" id="msd-legend"></div>
+  </section>
+
+  <section class="history-panel">
+    <div class="history-panel-head">
+      <h2>Recent calculations</h2>
+      <button class="btn-icon" type="button" id="history-clear">Clear history</button>
+    </div>
+    <ul class="history-list" id="history-list"></ul>
+    <p class="history-empty" id="history-empty">No calculations yet — your recent results will appear here.</p>
+  </section>
+
+  <footer class="page-footer">No accounts, no backend, no data storage — every calculation runs in your browser.</footer>
+</div>
+
+<!-- SheetJS (xlsx) — reads .xlsx/.xls files entirely client-side for the sample upload below.
+     Loaded with `defer` so it never blocks page render; the sample-file handler checks for it
+     at parse time and falls back to a clear message (pointing to CSV) if it failed to load. -->
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js" defer></script>
+<script src="shared.js"></script>
+<script>
+/* =========================================================================
+   DOM BINDINGS
+   Wires the calculation engine (shared.js) to this page.
+   ========================================================================= */
+
+function showError(box, message) {
+  box.textContent = message;
+  box.classList.add('show');
+}
+function hideError(box) {
+  box.classList.remove('show');
+  box.textContent = '';
+}
+function flashButton(btn, text, revertText) {
+  const original = revertText || btn.textContent;
+  btn.textContent = text;
+  setTimeout(() => { btn.textContent = original; }, 1600);
+}
+// Grows a .well-note textarea to fit its content (no fixed row count, no
+// internal scrollbar) — called on input and once right after each is placed
+// in the DOM so pre-filled notes (from a share link) start sized correctly.
+function autoSizeWellNote(el) {
+  el.style.height = 'auto';
+  el.style.height = el.scrollHeight + 'px';
+}
+function renderHistory() {
+  const list = getHistory();
+  const listEl = document.getElementById('history-list');
+  const emptyEl = document.getElementById('history-empty');
+  listEl.innerHTML = '';
+  if (list.length === 0) {
+    emptyEl.style.display = 'block';
+    return;
+  }
+  emptyEl.style.display = 'none';
+  list.forEach(entry => {
+    const li = document.createElement('li');
+    const a = document.createElement('a');
+    a.className = 'history-item';
+    a.href = entry.url;
+    a.innerHTML = `${entry.label}<span class="ts">${new Date(entry.ts).toLocaleString()}</span>`;
+    li.appendChild(a);
+    listEl.appendChild(li);
+  });
+}
+document.getElementById('history-clear').addEventListener('click', () => {
+  clearHistory();
+  renderHistory();
+});
+
+/* ------------------------- MSD plate ------------------------- */
+
+const msdError = document.getElementById('msd-error');
+const msdGrid = document.getElementById('msd-grid');
+const msdLegend = document.getElementById('msd-legend');
+
+let lastMsdWells = null;
+let lastMsdRows = null;
+let lastMsdCols = null;
+
+// Freeform custom row/column labels (see shared.css .plate-label-input).
+// The MSD plate is always a fixed 8x12 96-well grid, so these never need
+// resizing — index i = row/column i; '' means "use the default A-H / 1-12
+// label". This is what turns the standard-curve tool into a general MLR-style
+// plate plan (dilution ratios, donor pairings, test-article subtypes, etc).
+let msdRowLabels = new Array(8).fill('');
+let msdColLabels = new Array(12).fill('');
+
+// Freeform per-well notes (see shared.css .well-note) — wellId ("B3") -> text,
+// independent of and additive to whatever a well already computed/shows
+// (standard/blank/sample), so a plan can be hand-annotated like a wet-lab
+// MLR plan sheet.
+let msdWellNotes = {};
+
+// Sample start column auto-follows the standard block (start column + replicate
+// count) until the user edits the sample start column directly.
+let sampleStartColAuto = true;
+document.getElementById('msd-samplestartcol').addEventListener('input', () => {
+  sampleStartColAuto = false;
+});
+function updateSampleStartColAuto() {
+  if (!sampleStartColAuto) return;
+  const stdStart = parseInt(document.getElementById('msd-standardstartcol').value, 10);
+  const stdRep = parseInt(document.getElementById('msd-stdrep').value, 10);
+  if (Number.isInteger(stdStart) && stdStart > 0 && Number.isInteger(stdRep) && stdRep > 0) {
+    document.getElementById('msd-samplestartcol').value = stdStart + stdRep;
+  }
+}
+document.getElementById('msd-standardstartcol').addEventListener('input', updateSampleStartColAuto);
+document.getElementById('msd-stdrep').addEventListener('input', updateSampleStartColAuto);
+
+// readFileAsText/readFileAsArrayBuffer/isExcelFile/readWorkbookFromFile/
+// readRowsFromWorkbookSheet now live in shared.js — genuinely shared (not
+// per-page-duplicated) since plate-map.html's Condition List import needs
+// the exact same file/workbook reading, unlike showError/renderHistory etc.
+// which stay intentionally copy-pasted per page.
+
+/**
+ * Reads either a CSV or an Excel (.xlsx/.xls) file and returns the same
+ * sample-list structure ({ name, concentration, unit }[]) either way, so
+ * generateMsdPlate() downstream never needs to know which format was
+ * uploaded. This is the simple/default path — first worksheet, fixed
+ * SampleName/Concentration/Unit column order. For a sheet that doesn't match
+ * that shape (buried in a larger workbook, columns in a different order),
+ * see the "Advanced: pick sheet & columns" panel instead, which calls
+ * mapRowsToSamples() directly from the Generate handler.
+ */
+async function parseSampleFile(file, defaultUnit) {
+  if (isExcelFile(file)) {
+    const workbook = await readWorkbookFromFile(file);
+    const rows = readRowsFromWorkbookSheet(workbook, workbook.SheetNames[0]);
+    return parseMsdSampleRows(rows, defaultUnit, 'sample Excel file');
+  }
+  const text = await readFileAsText(file);
+  return parseMsdSampleCsv(text, defaultUnit);
+}
+
+/* ------------------------- Advanced sample import (sheet + column picker) -------------------------
+   Off by default — the simple upload above (parseSampleFile) keeps working
+   unchanged for the common case. This panel exists for a sample sheet that
+   doesn't match SampleName/Concentration/Unit in columns A/B/C: buried in a
+   larger multi-sheet workbook, or with the relevant columns elsewhere and
+   not contiguous. msdWorkbook/msdRawRows hold whatever was most
+   recently loaded so the Generate handler can read them without re-parsing. */
+
+let msdWorkbook = null;
+let msdRawRows = null;
+
+document.getElementById('msd-advanced-toggle').addEventListener('click', () => {
+  const panel = document.getElementById('msd-advanced-panel');
+  const opening = panel.style.display === 'none';
+  panel.style.display = opening ? 'block' : 'none';
+  document.getElementById('msd-advanced-toggle').textContent = opening ? 'Hide advanced options' : 'Advanced: pick sheet & columns';
+});
+
+function renderMsdPreviewTable(rows) {
+  const wrap = document.getElementById('msd-preview-wrap');
+  const table = document.getElementById('msd-preview-table');
+  const previewRows = (rows || []).slice(0, 8);
+  if (previewRows.length === 0) {
+    wrap.style.display = 'none';
+    return;
+  }
+  const maxCols = Math.max.apply(null, previewRows.map(r => r.length).concat([1]));
+  let html = '<thead><tr><th></th>';
+  for (let c = 0; c < maxCols; c++) html += `<th>${indexToSpreadsheetColumn(c)}</th>`;
+  html += '</tr></thead><tbody>';
+  previewRows.forEach((row, i) => {
+    html += `<tr><td>${i + 1}</td>`;
+    for (let c = 0; c < maxCols; c++) {
+      const v = row[c];
+      html += `<td>${(v === undefined || v === null || v === '') ? '' : String(v)}</td>`;
+    }
+    html += '</tr>';
+  });
+  html += '</tbody>';
+  table.innerHTML = html;
+  wrap.style.display = 'block';
+}
+
+function populateMsdSheetPicker(names) {
+  const sel = document.getElementById('msd-sheet');
+  sel.innerHTML = '';
+  names.forEach(n => {
+    const opt = document.createElement('option');
+    opt.value = n;
+    opt.textContent = n;
+    sel.appendChild(opt);
+  });
+  document.getElementById('msd-sheet-row').style.display = names.length > 1 ? 'grid' : 'none';
+}
+
+function loadMsdSelectedSheet() {
+  if (!msdWorkbook) return;
+  const sheetName = document.getElementById('msd-sheet').value || msdWorkbook.SheetNames[0];
+  msdRawRows = readRowsFromWorkbookSheet(msdWorkbook, sheetName);
+  renderMsdPreviewTable(msdRawRows);
+}
+document.getElementById('msd-sheet').addEventListener('change', loadMsdSelectedSheet);
+
+// Keeps the advanced preview/sheet-picker in sync with whatever file was
+// just chosen, regardless of whether the advanced panel is currently open —
+// so opening it after picking a file still shows the right preview.
+document.getElementById('msd-file').addEventListener('change', async () => {
+  msdWorkbook = null;
+  msdRawRows = null;
+  document.getElementById('msd-sheet-row').style.display = 'none';
+  document.getElementById('msd-preview-wrap').style.display = 'none';
+  const fileInput = document.getElementById('msd-file');
+  if (!fileInput.files || fileInput.files.length === 0) return;
+  const file = fileInput.files[0];
+  try {
+    if (isExcelFile(file)) {
+      msdWorkbook = await readWorkbookFromFile(file);
+      populateMsdSheetPicker(msdWorkbook.SheetNames);
+      loadMsdSelectedSheet();
+    } else {
+      const text = await readFileAsText(file);
+      msdRawRows = readRowsFromCsvText(text);
+      renderMsdPreviewTable(msdRawRows);
+    }
+  } catch (err) {
+    showError(msdError, err.message);
+  }
+});
+
+function buildMsdParams() {
+  return {
+    numstd: document.getElementById('msd-numstd').value,
+    factor: document.getElementById('msd-factor').value,
+    topcal: document.getElementById('msd-topcal').value,
+    topcalu: document.getElementById('msd-topcal-unit').value,
+    blank: document.getElementById('msd-blank').checked ? '1' : '',
+    stdstartcol: document.getElementById('msd-standardstartcol').value,
+    stdrep: document.getElementById('msd-stdrep').value,
+    samplerep: document.getElementById('msd-samplerep').value,
+    samplestartcol: document.getElementById('msd-samplestartcol').value,
+    rlbl: encodeLabelOverrides(msdRowLabels),
+    clbl: encodeLabelOverrides(msdColLabels),
+    notes: encodeWellNotes(msdWellNotes)
+  };
+}
+
+function renderMsdGrid() {
+  msdGrid.innerHTML = '';
+  // Fixed column width (not minmax(_, 1fr)) so every column is exactly the
+  // same width no matter how much a given well's content varies in length —
+  // this is what keeps the grid reading as an evenly-spaced table.
+  msdGrid.style.gridTemplateColumns = `36px repeat(${lastMsdCols}, 132px)`;
+
+  const corner = document.createElement('div');
+  corner.className = 'plate-corner';
+  msdGrid.appendChild(corner);
+
+  for (let c = 0; c < lastMsdCols; c++) {
+    const label = document.createElement('div');
+    label.className = 'plate-col-label';
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'plate-label-input';
+    const defaultColLabel = String(c + 1);
+    input.value = msdColLabels[c] || defaultColLabel;
+    input.setAttribute('aria-label', `Column ${defaultColLabel} label`);
+    input.addEventListener('input', () => {
+      msdColLabels[c] = (input.value === defaultColLabel) ? '' : input.value;
+    });
+    label.appendChild(input);
+    msdGrid.appendChild(label);
+  }
+
+  for (let r = 0; r < lastMsdRows; r++) {
+    const rowLabel = document.createElement('div');
+    rowLabel.className = 'plate-row-label';
+    const rowInput = document.createElement('input');
+    rowInput.type = 'text';
+    rowInput.className = 'plate-label-input';
+    const defaultRowLabel = rowLetterFromIndex(r);
+    rowInput.value = msdRowLabels[r] || defaultRowLabel;
+    rowInput.setAttribute('aria-label', `Row ${defaultRowLabel} label`);
+    rowInput.addEventListener('input', () => {
+      msdRowLabels[r] = (rowInput.value === defaultRowLabel) ? '' : rowInput.value;
+    });
+    rowLabel.appendChild(rowInput);
+    msdGrid.appendChild(rowLabel);
+
+    for (let c = 0; c < lastMsdCols; c++) {
+      const w = lastMsdWells[r * lastMsdCols + c];
+      const note = msdWellNotes[w.id] || '';
+      const btn = document.createElement('div');
+      btn.className = 'well';
+      btn.tabIndex = 0;
+
+      // A well with a custom note is no longer "empty" from the plan's point
+      // of view, even though nothing was computed for it — don't dash/fade it.
+      if (w.type === 'empty' && !note) btn.classList.add('state-empty');
+      if (w.type === 'blank') btn.classList.add('is-blank');
+      if (w.type === 'standard') btn.classList.add('type-standard');
+      if (w.type === 'sample') btn.classList.add('type-sample');
+
+      const idSpan = document.createElement('span');
+      idSpan.className = 'well-id';
+      idSpan.textContent = w.id;
+      btn.appendChild(idSpan);
+
+      if (w.type === 'blank') {
+        const labelSpan = document.createElement('span');
+        labelSpan.className = 'well-label';
+        labelSpan.textContent = 'Blank';
+        btn.appendChild(labelSpan);
+      } else if (w.type === 'standard' || w.type === 'sample') {
+        const labelSpan = document.createElement('span');
+        labelSpan.className = 'well-label';
+        labelSpan.textContent = w.label;
+        btn.appendChild(labelSpan);
+
+        const concSpan = document.createElement('span');
+        concSpan.className = 'well-conc';
+        concSpan.textContent = `${formatNumber(w.concValue)} ${w.concUnit}`;
+        btn.appendChild(concSpan);
+      }
+
+      const noteInput = document.createElement('textarea');
+      noteInput.className = 'well-note';
+      noteInput.rows = 1;
+      noteInput.placeholder = 'Note…';
+      noteInput.value = note;
+      noteInput.setAttribute('aria-label', `Note for well ${w.id}`);
+      noteInput.addEventListener('input', () => {
+        const val = noteInput.value;
+        if (val.trim() === '') delete msdWellNotes[w.id];
+        else msdWellNotes[w.id] = val;
+        autoSizeWellNote(noteInput);
+      });
+      btn.appendChild(noteInput);
+
+      let tooltip;
+      if (w.type === 'standard') tooltip = `${w.id}: ${w.label} — ${formatNumber(w.concValue)} ${w.concUnit}`;
+      else if (w.type === 'blank') tooltip = `${w.id}: Blank (0 ${w.concUnit})`;
+      else if (w.type === 'sample') tooltip = `${w.id}: ${w.label} — ${formatNumber(w.concValue)} ${w.concUnit}`;
+      else tooltip = `${w.id}: Empty`;
+      btn.title = tooltip;
+      btn.setAttribute('aria-label', tooltip);
+
+      msdGrid.appendChild(btn);
+      autoSizeWellNote(noteInput);
+    }
+  }
+}
+
+function renderMsdLegend() {
+  msdLegend.innerHTML = `
+    <span class="legend-item"><span class="legend-swatch type-standard"></span>Standard</span>
+    <span class="legend-item"><span class="legend-swatch type-sample"></span>Sample</span>
+    <span class="legend-item"><span class="legend-swatch is-blank"></span>Blank</span>
+    <span class="legend-item"><span class="legend-swatch state-empty"></span>Empty</span>
+  `;
+}
+
+document.getElementById('msd-generate').addEventListener('click', async () => {
+  hideError(msdError);
+
+  const numStandards = parseInt(document.getElementById('msd-numstd').value, 10);
+  const dilutionFactor = parseFloat(document.getElementById('msd-factor').value);
+  const topCalibrator = parseFloat(document.getElementById('msd-topcal').value);
+  const topCalibratorUnit = document.getElementById('msd-topcal-unit').value;
+  const includeBlank = document.getElementById('msd-blank').checked;
+  const standardStartCol = parseInt(document.getElementById('msd-standardstartcol').value, 10) - 1; // to 0-indexed
+  const standardReplicates = parseInt(document.getElementById('msd-stdrep').value, 10);
+  const sampleReplicates = parseInt(document.getElementById('msd-samplerep').value, 10);
+  const sampleStartCol = parseInt(document.getElementById('msd-samplestartcol').value, 10) - 1; // to 0-indexed
+
+  try {
+    if (document.getElementById('msd-numstd').value.trim() === '' ||
+        document.getElementById('msd-factor').value.trim() === '' ||
+        document.getElementById('msd-topcal').value.trim() === '' ||
+        document.getElementById('msd-standardstartcol').value.trim() === '' ||
+        document.getElementById('msd-stdrep').value.trim() === '' ||
+        document.getElementById('msd-samplerep').value.trim() === '' ||
+        document.getElementById('msd-samplestartcol').value.trim() === '') {
+      throw new Error('Please fill in all fields before generating.');
+    }
+
+    let samples = [];
+    const fileInput = document.getElementById('msd-file');
+    if (fileInput.files && fileInput.files.length > 0) {
+      const advancedOpen = document.getElementById('msd-advanced-panel').style.display !== 'none';
+      if (advancedOpen) {
+        if (!msdRawRows) throw new Error('Choose a worksheet first, or wait a moment for the file to finish loading.');
+        const nameColRaw = document.getElementById('msd-col-name').value.trim();
+        const concColRaw = document.getElementById('msd-col-conc').value.trim();
+        if (nameColRaw === '' || concColRaw === '') {
+          throw new Error('Enter both the sample name and concentration column letters.');
+        }
+        const nameCol = spreadsheetColumnToIndex(nameColRaw);
+        const concCol = spreadsheetColumnToIndex(concColRaw);
+        const unitColRaw = document.getElementById('msd-col-unit').value.trim();
+        const unitCol = unitColRaw === '' ? null : spreadsheetColumnToIndex(unitColRaw);
+        const skipRowsRaw = document.getElementById('msd-skiprows').value;
+        const skipRows = skipRowsRaw.trim() === '' ? 0 : parseInt(skipRowsRaw, 10);
+        if (!Number.isInteger(skipRows) || skipRows < 0) {
+          throw new Error('"Skip this many rows" must be a whole number of 0 or more.');
+        }
+        samples = mapRowsToSamples(msdRawRows, { nameCol, concCol, unitCol }, topCalibratorUnit, skipRows);
+      } else {
+        samples = await parseSampleFile(fileInput.files[0], topCalibratorUnit);
+      }
+    }
+
+    const map = generateMsdPlate({
+      numStandards, dilutionFactor, topCalibrator, topCalibratorUnit,
+      includeBlank, standardStartCol, standardReplicates, samples, sampleReplicates, sampleStartCol
+    });
+
+    lastMsdWells = map.wells;
+    lastMsdRows = map.rows;
+    lastMsdCols = map.cols;
+    renderMsdGrid();
+
+    const label = `MSD: ${numStandards}pt ${formatNumber(dilutionFactor)}-fold from ${formatNumber(topCalibrator)} ${topCalibratorUnit}${includeBlank ? ' + blank' : ''}, ${samples.length} sample${samples.length === 1 ? '' : 's'}`;
+    pushHistory({ tool: 'MSD Plate Planner', label, url: buildShareURL(buildMsdParams()) });
+    renderHistory();
+  } catch (err) {
+    msdGrid.innerHTML = '';
+    lastMsdWells = null;
+    showError(msdError, err.message);
+  }
+});
+
+document.getElementById('msd-reset').addEventListener('click', () => {
+  document.getElementById('msd-numstd').value = '7';
+  document.getElementById('msd-factor').value = '4';
+  document.getElementById('msd-topcal').value = '10000';
+  document.getElementById('msd-topcal-unit').value = 'pg/mL';
+  document.getElementById('msd-blank').checked = true;
+  document.getElementById('msd-standardstartcol').value = '1';
+  document.getElementById('msd-stdrep').value = '2';
+  document.getElementById('msd-samplerep').value = '2';
+  document.getElementById('msd-samplestartcol').value = '3';
+  document.getElementById('msd-file').value = '';
+  sampleStartColAuto = true;
+  document.getElementById('msd-share-url').textContent = '';
+  document.getElementById('msd-advanced-panel').style.display = 'none';
+  document.getElementById('msd-advanced-toggle').textContent = 'Advanced: pick sheet & columns';
+  document.getElementById('msd-sheet-row').style.display = 'none';
+  document.getElementById('msd-sheet').innerHTML = '';
+  document.getElementById('msd-preview-wrap').style.display = 'none';
+  document.getElementById('msd-preview-table').innerHTML = '';
+  document.getElementById('msd-skiprows').value = '1';
+  document.getElementById('msd-col-name').value = 'A';
+  document.getElementById('msd-col-conc').value = 'B';
+  document.getElementById('msd-col-unit').value = 'C';
+  msdWorkbook = null;
+  msdRawRows = null;
+  msdRowLabels = new Array(8).fill('');
+  msdColLabels = new Array(12).fill('');
+  msdWellNotes = {};
+  hideError(msdError);
+  msdGrid.innerHTML = '';
+  lastMsdWells = null;
+});
+
+document.getElementById('msd-download-template').addEventListener('click', () => {
+  downloadCSV('msd-sample-template.csv', [
+    ['SampleName', 'Concentration', 'Unit'],
+    ['Sample 1', '120', 'pg/mL'],
+    ['Sample 2', '85', 'pg/mL'],
+    ['Sample 3', '210', 'pg/mL']
+  ]);
+});
+
+document.getElementById('msd-export-csv').addEventListener('click', () => {
+  if (!lastMsdWells) {
+    showError(msdError, 'Generate a plate first, then export.');
+    return;
+  }
+  const rows = [['Well', 'Row', 'Row Label', 'Column', 'Column Label', 'Type', 'Label', 'Concentration', 'Note']];
+  lastMsdWells.forEach(w => {
+    const typeLabel = w.type === 'standard' ? 'Standard' : w.type === 'sample' ? 'Sample' : w.type === 'blank' ? 'Blank' : 'Empty';
+    const label = (w.type === 'sample' || w.type === 'standard') ? w.label : '';
+    const conc = (w.type === 'standard' || w.type === 'blank' || w.type === 'sample') ? `${formatNumber(w.concValue)} ${w.concUnit}` : '';
+    const rowLabel = msdRowLabels[w.rowIndex] || rowLetterFromIndex(w.rowIndex);
+    const colLabel = msdColLabels[w.colIndex] || String(w.colIndex + 1);
+    rows.push([w.id, rowLetterFromIndex(w.rowIndex), rowLabel, w.colIndex + 1, colLabel, typeLabel, label, conc, msdWellNotes[w.id] || '']);
+  });
+  downloadCSV('msd-plate.csv', rows);
+});
+
+document.getElementById('msd-share').addEventListener('click', () => {
+  const url = buildShareURL(buildMsdParams());
+  document.getElementById('msd-share-url').textContent = 'Shareable link: ' + url;
+  copyToClipboard(url).then(ok => {
+    flashButton(document.getElementById('msd-share'), ok ? 'Copied!' : 'Copy link', 'Copy link');
+  });
+});
+
+/* ------------------------- Share-link loader ------------------------- */
+
+(function loadFromShareParams() {
+  const params = parseShareParams();
+  if (!params.has('numstd')) return;
+
+  if (params.has('numstd')) document.getElementById('msd-numstd').value = params.get('numstd');
+  if (params.has('factor')) document.getElementById('msd-factor').value = params.get('factor');
+  if (params.has('topcal')) document.getElementById('msd-topcal').value = params.get('topcal');
+  if (params.has('topcalu')) document.getElementById('msd-topcal-unit').value = params.get('topcalu');
+  document.getElementById('msd-blank').checked = params.get('blank') === '1';
+  if (params.has('stdstartcol')) document.getElementById('msd-standardstartcol').value = params.get('stdstartcol');
+  if (params.has('stdrep')) document.getElementById('msd-stdrep').value = params.get('stdrep');
+  if (params.has('samplerep')) document.getElementById('msd-samplerep').value = params.get('samplerep');
+  if (params.has('samplestartcol')) {
+    document.getElementById('msd-samplestartcol').value = params.get('samplestartcol');
+    sampleStartColAuto = false;
+  }
+
+  msdRowLabels = decodeLabelOverrides(params.get('rlbl'), 8);
+  msdColLabels = decodeLabelOverrides(params.get('clbl'), 12);
+  msdWellNotes = decodeWellNotes(params.get('notes'));
+
+  document.getElementById('msd-generate').click();
+})();
+
+renderMsdLegend();
+initTheme();
+renderHistory();
+</script>
+</body>
+</html>

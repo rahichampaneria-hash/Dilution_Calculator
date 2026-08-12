@@ -1,0 +1,978 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Plate Map Generator</title>
+<link rel="stylesheet" href="shared.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🧪</text></svg>">
+<script>
+// Applied before first paint to avoid a flash of the wrong theme.
+(function() {
+  try {
+    var t = localStorage.getItem('dilutionToolkit.theme');
+    if (!t) {
+      t = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+    }
+    document.documentElement.setAttribute('data-theme', t);
+  } catch (e) {}
+})();
+</script>
+</head>
+<body>
+<header class="navbar">
+  <div class="nav-inner">
+    <a class="nav-brand" href="index.html"><span class="brand-mark">DT</span> Dilution Toolkit</a>
+    <nav class="nav-links">
+      <a href="index.html">Home</a>
+      <a href="dilution.html">Dilution Calculator</a>
+      <a href="stock-solution.html">Stock Solution Planner</a>
+      <a href="plate-map.html" aria-current="page">Plate Map Generator</a>
+      <a href="msd-plate.html">MSD Plate Planner</a>
+    </nav>
+    <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Toggle dark mode">Dark</button>
+  </div>
+</header>
+
+<div class="wrap">
+  <header class="page-header">
+    <h1>Plate Map Generator</h1>
+    <p>Lay out a serial dilution series, or import a condition list from a spreadsheet, across a 96- or 384-well plate — with each well labeled directly, click-to-mark blank/control wells, freeform well/row/column labels, and CSV export.</p>
+  </header>
+
+  <div class="tabs">
+    <button class="tab active" data-mode="dilution" type="button">Dilution Series</button>
+    <button class="tab" data-mode="condition" type="button">Condition List</button>
+  </div>
+
+  <section class="panel active" id="dilution-panel">
+    <h2>Generate a plate map</h2>
+    <p class="panel-sub">Choose a plate format and direction, pick a start well, and enter your dilution series. The number of wells must fit the plate from your start well onward.</p>
+
+    <div class="mode-tabs" id="pm-format-tabs">
+      <button class="tab active" data-format="96" type="button">96-well (8×12)</button>
+      <button class="tab" data-format="384" type="button">384-well (16×24)</button>
+    </div>
+
+    <div class="mode-tabs" id="pm-direction-tabs">
+      <button class="tab active" data-direction="down" type="button">Down a column</button>
+      <button class="tab" data-direction="across" type="button">Across a row</button>
+    </div>
+
+    <div class="field-row" style="grid-template-columns:1fr 1fr;">
+      <div class="field">
+        <label for="pm-start-row">Start row</label>
+        <select id="pm-start-row"></select>
+      </div>
+      <div class="field">
+        <label for="pm-start-col">Start column</label>
+        <select id="pm-start-col"></select>
+      </div>
+    </div>
+
+    <div class="field-row">
+      <div class="field">
+        <label for="pm-stock">Starting concentration</label>
+        <input type="number" id="pm-stock" placeholder="e.g. 10" step="any" min="0">
+      </div>
+      <div class="field">
+        <label for="pm-stock-unit">Unit</label>
+        <select id="pm-stock-unit">
+          <option value="nM">nM</option>
+          <option value="µM">µM</option>
+          <option value="mM" selected>mM</option>
+          <option value="M">M</option>
+          <option value="ng/mL">ng/mL</option>
+          <option value="µg/mL">µg/mL</option>
+          <option value="mg/mL">mg/mL</option>
+          <option value="pg/mL">pg/mL</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="field-row" style="grid-template-columns:1fr 1fr;">
+      <div class="field">
+        <label for="pm-factor">Dilution factor (e.g. 2 for 1:2)</label>
+        <input type="number" id="pm-factor" placeholder="e.g. 2" step="any" min="1">
+      </div>
+      <div class="field">
+        <label for="pm-steps">Wells in series (includes start well)</label>
+        <input type="number" id="pm-steps" placeholder="e.g. 8" step="1" min="1">
+      </div>
+    </div>
+
+    <div class="checkbox-field">
+      <input type="checkbox" id="pm-replicate">
+      <label for="pm-replicate">Repeat across plate (stamp this series into every column/row)</label>
+    </div>
+
+    <p class="hint">Well A1 is the top-left well. "Wells in series" counts the start well itself as the first (undiluted) well, so an 8-well series has 7 dilution steps after it.</p>
+
+    <div class="btn-row">
+      <button class="primary" type="button" id="pm-generate">Generate</button>
+      <button class="secondary" type="button" id="pm-reset">Reset</button>
+      <button class="btn-icon" type="button" id="pm-export-csv">Export CSV</button>
+      <button class="btn-icon" type="button" id="pm-share">Copy link</button>
+    </div>
+    <p class="hint" id="pm-share-url"></p>
+
+    <div class="error-box" id="pm-error"></div>
+
+    <p class="hint">Row/column headers and each individual well are editable — click a header to relabel a row or column (e.g. "1:10"), or click a well's "Note…" line to annotate it directly, for planning layouts beyond a single dilution series.</p>
+
+    <div class="plate-scroll">
+      <div class="plate-grid" id="pm-grid"></div>
+    </div>
+    <div class="plate-legend" id="pm-legend"></div>
+  </section>
+
+  <section class="panel" id="condition-panel">
+    <h2>Generate a plate plan from a condition list</h2>
+    <p class="panel-sub">Upload a spreadsheet with a list of conditions/treatments — one row per replicate, or one row per condition plus a replicate-count column — and tell the tool which columns matter. Works with a messy real lab spreadsheet: pick the worksheet and columns that actually hold your data, everything else is ignored.</p>
+
+    <div class="field-row" style="grid-template-columns:1fr;">
+      <div class="field">
+        <label for="pmc-file">Spreadsheet (CSV or Excel)</label>
+        <input type="file" id="pmc-file" accept=".csv,text/csv,.xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel">
+      </div>
+    </div>
+
+    <div class="field-row" style="grid-template-columns:1fr; display:none;" id="pmc-sheet-row">
+      <div class="field">
+        <label for="pmc-sheet">Worksheet</label>
+        <select id="pmc-sheet"></select>
+      </div>
+    </div>
+
+    <div class="table-scroll" id="pmc-preview-wrap" style="display:none;">
+      <table id="pmc-preview-table"></table>
+    </div>
+
+    <div class="field-row" style="grid-template-columns:1fr;">
+      <div class="field">
+        <label for="pmc-skiprows">Skip this many rows at the top (header row, or anything else before the real data starts)</label>
+        <input type="number" id="pmc-skiprows" value="1" step="1" min="0">
+      </div>
+    </div>
+
+    <p class="hint">Tell the tool which column holds what — read the letters off the preview table above.</p>
+
+    <div class="field-row" style="grid-template-columns:1fr 1fr 1fr;">
+      <div class="field">
+        <label for="pmc-col-label">Condition/label column</label>
+        <input type="text" id="pmc-col-label" placeholder="e.g. B" maxlength="3">
+      </div>
+      <div class="field">
+        <label for="pmc-col-count">Replicate count column (optional)</label>
+        <input type="text" id="pmc-col-count" placeholder="e.g. D" maxlength="3">
+      </div>
+      <div class="field">
+        <label for="pmc-col-note">Note column (optional)</label>
+        <input type="text" id="pmc-col-note" placeholder="e.g. E" maxlength="3">
+      </div>
+    </div>
+    <p class="hint">Leave "Replicate count column" blank if the sheet already has one row per replicate (e.g. the same condition listed twice for a duplicate) — that's how a plate-plan sheet is usually laid out already.</p>
+
+    <div class="mode-tabs" id="pmc-format-tabs">
+      <button class="tab active" data-format="96" type="button">96-well (8×12)</button>
+      <button class="tab" data-format="384" type="button">384-well (16×24)</button>
+    </div>
+
+    <div class="mode-tabs" id="pmc-direction-tabs">
+      <button class="tab active" data-direction="down" type="button">Down a column</button>
+      <button class="tab" data-direction="across" type="button">Across a row</button>
+    </div>
+
+    <div class="field-row" style="grid-template-columns:1fr 1fr;">
+      <div class="field">
+        <label for="pmc-start-row">Start row</label>
+        <select id="pmc-start-row"></select>
+      </div>
+      <div class="field">
+        <label for="pmc-start-col">Start column</label>
+        <select id="pmc-start-col"></select>
+      </div>
+    </div>
+
+    <p class="hint">Conditions fill sequentially from the start well, wrapping into the next column (or row) once one fills — the same way you'd place a numbered list onto a plate by hand.</p>
+
+    <div class="btn-row">
+      <button class="primary" type="button" id="pmc-generate">Generate</button>
+      <button class="secondary" type="button" id="pmc-reset">Reset</button>
+      <button class="btn-icon" type="button" id="pmc-export-csv">Export CSV</button>
+    </div>
+    <p class="hint">This tab doesn't yet support share links, since the plan comes from an uploaded file rather than typed-in numbers — export CSV to keep a copy.</p>
+
+    <div class="error-box" id="pmc-error"></div>
+
+    <p class="hint">Row/column headers and each individual well are editable, same as the Dilution Series tab — click a header to relabel it, or a well's "Note…" line to annotate it (pre-filled from your Note column, if you mapped one).</p>
+
+    <div class="plate-scroll">
+      <div class="plate-grid" id="pmc-grid"></div>
+    </div>
+  </section>
+
+  <section class="history-panel">
+    <div class="history-panel-head">
+      <h2>Recent calculations</h2>
+      <button class="btn-icon" type="button" id="history-clear">Clear history</button>
+    </div>
+    <ul class="history-list" id="history-list"></ul>
+    <p class="history-empty" id="history-empty">No calculations yet — your recent results will appear here.</p>
+  </section>
+
+  <footer class="page-footer">No accounts, no backend, no data storage — every calculation runs in your browser.</footer>
+</div>
+
+<!-- SheetJS (xlsx) — reads .xlsx/.xls files entirely client-side for the Condition
+     List tab's spreadsheet import. Loaded with `defer` so it never blocks page
+     render; the import handler checks for it at parse time and falls back to a
+     clear message (pointing to CSV) if it failed to load. -->
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js" defer></script>
+<script src="shared.js"></script>
+<script>
+/* =========================================================================
+   DOM BINDINGS
+   Wires the calculation engine (shared.js) to this page.
+   ========================================================================= */
+
+function showError(box, message) {
+  box.textContent = message;
+  box.classList.add('show');
+}
+function hideError(box) {
+  box.classList.remove('show');
+  box.textContent = '';
+}
+function flashButton(btn, text, revertText) {
+  const original = revertText || btn.textContent;
+  btn.textContent = text;
+  setTimeout(() => { btn.textContent = original; }, 1600);
+}
+// Grows a .well-note textarea to fit its content (no fixed row count, no
+// internal scrollbar) — called on input and once right after each is placed
+// in the DOM so pre-filled notes (from a share link) start sized correctly.
+function autoSizeWellNote(el) {
+  el.style.height = 'auto';
+  el.style.height = el.scrollHeight + 'px';
+}
+function renderHistory() {
+  const list = getHistory();
+  const listEl = document.getElementById('history-list');
+  const emptyEl = document.getElementById('history-empty');
+  listEl.innerHTML = '';
+  if (list.length === 0) {
+    emptyEl.style.display = 'block';
+    return;
+  }
+  emptyEl.style.display = 'none';
+  list.forEach(entry => {
+    const li = document.createElement('li');
+    const a = document.createElement('a');
+    a.className = 'history-item';
+    a.href = entry.url;
+    a.innerHTML = `${entry.label}<span class="ts">${new Date(entry.ts).toLocaleString()}</span>`;
+    li.appendChild(a);
+    listEl.appendChild(li);
+  });
+}
+document.getElementById('history-clear').addEventListener('click', () => {
+  clearHistory();
+  renderHistory();
+});
+
+// --- Top-level tab switching (Dilution Series / Condition List) ---
+document.querySelectorAll('.wrap > .tabs .tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.wrap > .tabs .tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.wrap > .panel').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById(tab.dataset.mode + '-panel').classList.add('active');
+  });
+});
+
+/* ------------------------- Plate map ------------------------- */
+
+const pmError = document.getElementById('pm-error');
+const pmGrid = document.getElementById('pm-grid');
+const pmLegend = document.getElementById('pm-legend');
+
+let lastPlateWells = null;
+let lastPlateRows = null;
+let lastPlateCols = null;
+let lastPlateFormat = null;
+
+// Freeform custom row/column labels (see shared.css .plate-label-input).
+// Index i = row/column i; '' means "use the default A-H / 1-12 label".
+// Sized to the current format and resized (preserving overlap) whenever the
+// format changes, so switching 96<->384 doesn't silently discard labels that
+// still apply.
+let rowLabels = [];
+let colLabels = [];
+
+// Freeform per-well notes (see shared.css .well-note) — wellId ("A1") -> text.
+// Independent of format, since well IDs are self-describing; switching
+// 96<->384 just naturally shows/hides whichever IDs exist on that format.
+let wellNotes = {};
+
+function currentFormat() {
+  return document.querySelector('#pm-format-tabs .tab.active').dataset.format;
+}
+function currentDirection() {
+  return document.querySelector('#pm-direction-tabs .tab.active').dataset.direction;
+}
+
+function resizeLabelArrays(format) {
+  const { rows, cols } = PLATE_FORMATS[format];
+  rowLabels = Array.from({ length: rows }, (_, i) => rowLabels[i] || '');
+  colLabels = Array.from({ length: cols }, (_, i) => colLabels[i] || '');
+}
+
+function clearLabelArrays(format) {
+  const { rows, cols } = PLATE_FORMATS[format];
+  rowLabels = new Array(rows).fill('');
+  colLabels = new Array(cols).fill('');
+}
+
+function repopulateStartWellOptions() {
+  const format = currentFormat();
+  const { rows, cols } = PLATE_FORMATS[format];
+  const rowSel = document.getElementById('pm-start-row');
+  const colSel = document.getElementById('pm-start-col');
+  const prevRow = rowSel.value;
+  const prevCol = colSel.value;
+
+  rowSel.innerHTML = '';
+  for (let r = 0; r < rows; r++) {
+    const opt = document.createElement('option');
+    opt.value = r;
+    opt.textContent = rowLetterFromIndex(r);
+    rowSel.appendChild(opt);
+  }
+  colSel.innerHTML = '';
+  for (let c = 0; c < cols; c++) {
+    const opt = document.createElement('option');
+    opt.value = c;
+    opt.textContent = c + 1;
+    colSel.appendChild(opt);
+  }
+
+  if (prevRow !== '' && Number(prevRow) < rows) rowSel.value = prevRow;
+  if (prevCol !== '' && Number(prevCol) < cols) colSel.value = prevCol;
+}
+
+document.querySelectorAll('#pm-format-tabs .tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('#pm-format-tabs .tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    repopulateStartWellOptions();
+    resizeLabelArrays(currentFormat());
+  });
+});
+
+document.querySelectorAll('#pm-direction-tabs .tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('#pm-direction-tabs .tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+  });
+});
+
+function buildPlateParams() {
+  return {
+    fmt: currentFormat(),
+    dir: currentDirection(),
+    sr: document.getElementById('pm-start-row').value,
+    sc: document.getElementById('pm-start-col').value,
+    stock: document.getElementById('pm-stock').value,
+    stocku: document.getElementById('pm-stock-unit').value,
+    factor: document.getElementById('pm-factor').value,
+    steps: document.getElementById('pm-steps').value,
+    rep: document.getElementById('pm-replicate').checked ? '1' : '',
+    rlbl: encodeLabelOverrides(rowLabels),
+    clbl: encodeLabelOverrides(colLabels),
+    notes: encodeWellNotes(wellNotes)
+  };
+}
+
+function renderPlateGrid() {
+  pmGrid.innerHTML = '';
+  pmGrid.dataset.format = lastPlateFormat;
+  // Fixed column width (not minmax(_, 1fr)) so every column is exactly the
+  // same width no matter how much a given well's content varies in length —
+  // this is what keeps the grid reading as an evenly-spaced table.
+  const cellWidth = lastPlateFormat === '384' ? '92px' : '132px';
+  pmGrid.style.gridTemplateColumns = `36px repeat(${lastPlateCols}, ${cellWidth})`;
+
+  const corner = document.createElement('div');
+  corner.className = 'plate-corner';
+  pmGrid.appendChild(corner);
+
+  for (let c = 0; c < lastPlateCols; c++) {
+    const label = document.createElement('div');
+    label.className = 'plate-col-label';
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'plate-label-input';
+    const defaultColLabel = String(c + 1);
+    input.value = colLabels[c] || defaultColLabel;
+    input.setAttribute('aria-label', `Column ${defaultColLabel} label`);
+    input.addEventListener('input', () => {
+      colLabels[c] = (input.value === defaultColLabel) ? '' : input.value;
+    });
+    label.appendChild(input);
+    pmGrid.appendChild(label);
+  }
+
+  for (let r = 0; r < lastPlateRows; r++) {
+    const rowLabel = document.createElement('div');
+    rowLabel.className = 'plate-row-label';
+    const rowInput = document.createElement('input');
+    rowInput.type = 'text';
+    rowInput.className = 'plate-label-input';
+    const defaultRowLabel = rowLetterFromIndex(r);
+    rowInput.value = rowLabels[r] || defaultRowLabel;
+    rowInput.setAttribute('aria-label', `Row ${defaultRowLabel} label`);
+    rowInput.addEventListener('input', () => {
+      rowLabels[r] = (rowInput.value === defaultRowLabel) ? '' : rowInput.value;
+    });
+    rowLabel.appendChild(rowInput);
+    pmGrid.appendChild(rowLabel);
+
+    for (let c = 0; c < lastPlateCols; c++) {
+      const w = lastPlateWells[r * lastPlateCols + c];
+      const note = wellNotes[w.id] || '';
+      const btn = document.createElement('div');
+      btn.className = 'well clickable';
+      btn.tabIndex = 0;
+
+      // A well with a custom note is no longer "empty" from the plan's point
+      // of view, even though nothing was computed for it — don't dash/fade it.
+      if (w.state === 'empty' && !note) btn.classList.add('state-empty');
+      // No fill colour on series wells — a colour gradient was tried here and
+      // read as a hard-to-see solid fill rather than a subtle cue; each
+      // well's exact concentration is already printed as text below, which
+      // is the plain-bordered-table look this grid is going for.
+      if (w.isBlank) btn.classList.add('is-blank');
+
+      const idSpan = document.createElement('span');
+      idSpan.className = 'well-id';
+      idSpan.textContent = w.id;
+      btn.appendChild(idSpan);
+
+      if (w.state === 'series' && !w.isBlank) {
+        const concSpan = document.createElement('span');
+        concSpan.className = 'well-conc';
+        concSpan.textContent = `${formatNumber(w.concValue)} ${w.concUnit}`;
+        btn.appendChild(concSpan);
+      }
+
+      const noteInput = document.createElement('textarea');
+      noteInput.className = 'well-note';
+      noteInput.rows = 1;
+      noteInput.placeholder = 'Note…';
+      noteInput.value = note;
+      noteInput.setAttribute('aria-label', `Note for well ${w.id}`);
+      noteInput.addEventListener('input', () => {
+        const val = noteInput.value;
+        if (val.trim() === '') delete wellNotes[w.id];
+        else wellNotes[w.id] = val;
+        autoSizeWellNote(noteInput);
+      });
+      btn.appendChild(noteInput);
+
+      const tooltip = w.isBlank
+        ? `${w.id}: Blank`
+        : w.state === 'series'
+          ? `${w.id}: ${formatNumber(w.concValue)} ${w.concUnit}`
+          : `${w.id}: Empty`;
+      btn.title = tooltip;
+      btn.setAttribute('aria-label', tooltip);
+
+      // Click-to-toggle-blank still applies anywhere in the well EXCEPT the
+      // note textarea, so typing/clicking to edit a note doesn't also flip
+      // the well's blank state.
+      btn.addEventListener('click', (e) => {
+        if (e.target.closest('.well-note')) return;
+        w.isBlank = !w.isBlank;
+        renderPlateGrid();
+      });
+
+      pmGrid.appendChild(btn);
+      autoSizeWellNote(noteInput);
+    }
+  }
+}
+
+function renderPlateLegend() {
+  const seriesWells = lastPlateWells.filter(w => w.state === 'series');
+  if (seriesWells.length === 0) {
+    pmLegend.innerHTML = '';
+    return;
+  }
+  const minWell = seriesWells.reduce((a, b) => (a.concBaseValue < b.concBaseValue ? a : b));
+  const maxWell = seriesWells.reduce((a, b) => (a.concBaseValue > b.concBaseValue ? a : b));
+  pmLegend.innerHTML = `
+    <span>Lowest: ${formatNumber(minWell.concValue)} ${minWell.concUnit}</span>
+    <span>Highest: ${formatNumber(maxWell.concValue)} ${maxWell.concUnit}</span>
+  `;
+}
+
+document.getElementById('pm-generate').addEventListener('click', () => {
+  hideError(pmError);
+
+  const format = currentFormat();
+  const direction = currentDirection();
+  const startRow = parseInt(document.getElementById('pm-start-row').value, 10);
+  const startCol = parseInt(document.getElementById('pm-start-col').value, 10);
+  const startConc = parseFloat(document.getElementById('pm-stock').value);
+  const startConcUnit = document.getElementById('pm-stock-unit').value;
+  const dilutionFactor = parseFloat(document.getElementById('pm-factor').value);
+  // parseFloat (not parseInt) so a non-integer entry fails generatePlateMap's
+  // integer check instead of silently truncating.
+  const steps = parseFloat(document.getElementById('pm-steps').value);
+  const replicateAcrossPlate = document.getElementById('pm-replicate').checked;
+
+  try {
+    if (document.getElementById('pm-stock').value.trim() === '' ||
+        document.getElementById('pm-factor').value.trim() === '' ||
+        document.getElementById('pm-steps').value.trim() === '') {
+      throw new Error('Please fill in all fields before generating.');
+    }
+
+    const map = generatePlateMap({
+      format, direction, startRow, startCol,
+      startConc, startConcUnit, dilutionFactor, steps, replicateAcrossPlate
+    });
+
+    const wells = map.wells.map(w => Object.assign({ isBlank: false }, w));
+
+    lastPlateWells = wells;
+    lastPlateRows = map.rows;
+    lastPlateCols = map.cols;
+    lastPlateFormat = map.format;
+
+    renderPlateGrid();
+    renderPlateLegend();
+
+    const wellIdStart = wellId(startRow, startCol);
+    const label = `Plate: ${format}-well, ${direction} from ${wellIdStart}, ${formatNumber(startConc)} ${startConcUnit} ×${formatNumber(dilutionFactor)}, ${steps} wells${replicateAcrossPlate ? ' (replicated)' : ''}`;
+    pushHistory({ tool: 'Plate Map Generator', label, url: buildShareURL(buildPlateParams()) });
+    renderHistory();
+  } catch (err) {
+    pmGrid.innerHTML = '';
+    pmLegend.innerHTML = '';
+    lastPlateWells = null;
+    showError(pmError, err.message);
+  }
+});
+
+document.getElementById('pm-reset').addEventListener('click', () => {
+  document.querySelector('#pm-format-tabs .tab[data-format="96"]').click();
+  document.querySelector('#pm-direction-tabs .tab[data-direction="down"]').click();
+  document.getElementById('pm-stock').value = '';
+  document.getElementById('pm-factor').value = '';
+  document.getElementById('pm-steps').value = '';
+  document.getElementById('pm-replicate').checked = false;
+  document.getElementById('pm-share-url').textContent = '';
+  clearLabelArrays(currentFormat());
+  wellNotes = {};
+  hideError(pmError);
+  pmGrid.innerHTML = '';
+  pmLegend.innerHTML = '';
+  lastPlateWells = null;
+});
+
+document.getElementById('pm-export-csv').addEventListener('click', () => {
+  if (!lastPlateWells) {
+    showError(pmError, 'Generate a plate map first, then export.');
+    return;
+  }
+  const rows = [['Well', 'Row', 'Row Label', 'Column', 'Column Label', 'State', 'Concentration', 'Note']];
+  lastPlateWells.forEach(w => {
+    const state = w.isBlank ? 'Blank' : (w.state === 'series' ? 'Series' : 'Empty');
+    const conc = (w.state === 'series' && !w.isBlank) ? `${formatNumber(w.concValue)} ${w.concUnit}` : '';
+    const rowLabel = rowLabels[w.rowIndex] || rowLetterFromIndex(w.rowIndex);
+    const colLabel = colLabels[w.colIndex] || String(w.colIndex + 1);
+    rows.push([w.id, rowLetterFromIndex(w.rowIndex), rowLabel, w.colIndex + 1, colLabel, state, conc, wellNotes[w.id] || '']);
+  });
+  downloadCSV('plate-map.csv', rows);
+});
+
+document.getElementById('pm-share').addEventListener('click', () => {
+  const url = buildShareURL(buildPlateParams());
+  document.getElementById('pm-share-url').textContent = 'Shareable link: ' + url;
+  copyToClipboard(url).then(ok => {
+    flashButton(document.getElementById('pm-share'), ok ? 'Copied!' : 'Copy link', 'Copy link');
+  });
+});
+
+/* ------------------------- Share-link loader ------------------------- */
+
+repopulateStartWellOptions();
+resizeLabelArrays(currentFormat());
+
+(function loadFromShareParams() {
+  const params = parseShareParams();
+  if (!params.has('fmt')) return;
+
+  const formatBtn = document.querySelector(`#pm-format-tabs .tab[data-format="${params.get('fmt')}"]`);
+  if (formatBtn) formatBtn.click();
+
+  const direction = params.get('dir') || 'down';
+  const dirBtn = document.querySelector(`#pm-direction-tabs .tab[data-direction="${direction}"]`);
+  if (dirBtn) dirBtn.click();
+
+  if (params.has('sr')) document.getElementById('pm-start-row').value = params.get('sr');
+  if (params.has('sc')) document.getElementById('pm-start-col').value = params.get('sc');
+  if (params.has('stock')) document.getElementById('pm-stock').value = params.get('stock');
+  if (params.has('stocku')) document.getElementById('pm-stock-unit').value = params.get('stocku');
+  if (params.has('factor')) document.getElementById('pm-factor').value = params.get('factor');
+  if (params.has('steps')) document.getElementById('pm-steps').value = params.get('steps');
+  document.getElementById('pm-replicate').checked = params.get('rep') === '1';
+
+  // Format/direction .click() above already resized rowLabels/colLabels to
+  // the right length for the shared format — decode on top of that.
+  const { rows, cols } = PLATE_FORMATS[currentFormat()];
+  rowLabels = decodeLabelOverrides(params.get('rlbl'), rows);
+  colLabels = decodeLabelOverrides(params.get('clbl'), cols);
+  wellNotes = decodeWellNotes(params.get('notes'));
+
+  document.getElementById('pm-generate').click();
+})();
+
+/* ------------------------- Condition List (spreadsheet import) -------------------------
+   A second, independent "tool" living on this page (same pattern as
+   dilution.html's Simple/Serial tabs) — own state, own render function, own
+   CSV export. Reuses .well/.well-note/.plate-label-input styling and the
+   shared spreadsheet-import helpers in shared.js, but the underlying data
+   shape (label+note per well, from an uploaded file) is different enough
+   from the dilution-series wells that keeping this separate rather than
+   forcing one shared renderer is the same tradeoff CLAUDE.md already
+   documents for the rest of this site's intentional per-tool duplication. */
+
+const pmcError = document.getElementById('pmc-error');
+const pmcGrid = document.getElementById('pmc-grid');
+
+let pmcWorkbook = null;   // SheetJS workbook, if the uploaded file was Excel
+let pmcRows = null;       // currently selected sheet's raw rows (2D array) — CSV files populate this directly
+let lastConditionWells = null;
+let lastConditionRows = null;
+let lastConditionCols = null;
+let lastConditionFormat = null;
+
+let pmcRowLabels = [];
+let pmcColLabels = [];
+let pmcWellNotes = {};
+
+function pmcCurrentFormat() {
+  return document.querySelector('#pmc-format-tabs .tab.active').dataset.format;
+}
+function pmcCurrentDirection() {
+  return document.querySelector('#pmc-direction-tabs .tab.active').dataset.direction;
+}
+function pmcResizeLabelArrays(format) {
+  const { rows, cols } = PLATE_FORMATS[format];
+  pmcRowLabels = Array.from({ length: rows }, (_, i) => pmcRowLabels[i] || '');
+  pmcColLabels = Array.from({ length: cols }, (_, i) => pmcColLabels[i] || '');
+}
+function pmcClearLabelArrays(format) {
+  const { rows, cols } = PLATE_FORMATS[format];
+  pmcRowLabels = new Array(rows).fill('');
+  pmcColLabels = new Array(cols).fill('');
+}
+function pmcRepopulateStartWellOptions() {
+  const format = pmcCurrentFormat();
+  const { rows, cols } = PLATE_FORMATS[format];
+  const rowSel = document.getElementById('pmc-start-row');
+  const colSel = document.getElementById('pmc-start-col');
+  const prevRow = rowSel.value;
+  const prevCol = colSel.value;
+  rowSel.innerHTML = '';
+  for (let r = 0; r < rows; r++) {
+    const opt = document.createElement('option');
+    opt.value = r;
+    opt.textContent = rowLetterFromIndex(r);
+    rowSel.appendChild(opt);
+  }
+  colSel.innerHTML = '';
+  for (let c = 0; c < cols; c++) {
+    const opt = document.createElement('option');
+    opt.value = c;
+    opt.textContent = c + 1;
+    colSel.appendChild(opt);
+  }
+  if (prevRow !== '' && Number(prevRow) < rows) rowSel.value = prevRow;
+  if (prevCol !== '' && Number(prevCol) < cols) colSel.value = prevCol;
+}
+
+document.querySelectorAll('#pmc-format-tabs .tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('#pmc-format-tabs .tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    pmcRepopulateStartWellOptions();
+    pmcResizeLabelArrays(pmcCurrentFormat());
+  });
+});
+document.querySelectorAll('#pmc-direction-tabs .tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('#pmc-direction-tabs .tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+  });
+});
+pmcRepopulateStartWellOptions();
+pmcResizeLabelArrays(pmcCurrentFormat());
+
+function pmcRenderPreviewTable(rows) {
+  const wrap = document.getElementById('pmc-preview-wrap');
+  const table = document.getElementById('pmc-preview-table');
+  const previewRows = (rows || []).slice(0, 8);
+  if (previewRows.length === 0) {
+    wrap.style.display = 'none';
+    return;
+  }
+  const maxCols = Math.max.apply(null, previewRows.map(r => r.length).concat([1]));
+  let html = '<thead><tr><th></th>';
+  for (let c = 0; c < maxCols; c++) html += `<th>${indexToSpreadsheetColumn(c)}</th>`;
+  html += '</tr></thead><tbody>';
+  previewRows.forEach((row, i) => {
+    html += `<tr><td>${i + 1}</td>`;
+    for (let c = 0; c < maxCols; c++) {
+      const v = row[c];
+      html += `<td>${(v === undefined || v === null || v === '') ? '' : String(v)}</td>`;
+    }
+    html += '</tr>';
+  });
+  html += '</tbody>';
+  table.innerHTML = html;
+  wrap.style.display = 'block';
+}
+
+function pmcPopulateSheetPicker(names) {
+  const sel = document.getElementById('pmc-sheet');
+  sel.innerHTML = '';
+  names.forEach(n => {
+    const opt = document.createElement('option');
+    opt.value = n;
+    opt.textContent = n;
+    sel.appendChild(opt);
+  });
+  document.getElementById('pmc-sheet-row').style.display = names.length > 1 ? 'grid' : 'none';
+}
+
+function pmcLoadSelectedSheet() {
+  if (!pmcWorkbook) return;
+  const sheetName = document.getElementById('pmc-sheet').value || pmcWorkbook.SheetNames[0];
+  pmcRows = readRowsFromWorkbookSheet(pmcWorkbook, sheetName);
+  pmcRenderPreviewTable(pmcRows);
+}
+document.getElementById('pmc-sheet').addEventListener('change', pmcLoadSelectedSheet);
+
+document.getElementById('pmc-file').addEventListener('change', async () => {
+  hideError(pmcError);
+  pmcWorkbook = null;
+  pmcRows = null;
+  document.getElementById('pmc-sheet-row').style.display = 'none';
+  document.getElementById('pmc-preview-wrap').style.display = 'none';
+  const fileInput = document.getElementById('pmc-file');
+  if (!fileInput.files || fileInput.files.length === 0) return;
+  const file = fileInput.files[0];
+  try {
+    if (isExcelFile(file)) {
+      pmcWorkbook = await readWorkbookFromFile(file);
+      pmcPopulateSheetPicker(pmcWorkbook.SheetNames);
+      pmcLoadSelectedSheet();
+    } else {
+      const text = await readFileAsText(file);
+      pmcRows = readRowsFromCsvText(text);
+      pmcRenderPreviewTable(pmcRows);
+    }
+  } catch (err) {
+    showError(pmcError, err.message);
+  }
+});
+
+function renderConditionGrid() {
+  pmcGrid.innerHTML = '';
+  pmcGrid.dataset.format = lastConditionFormat;
+  const cellWidth = lastConditionFormat === '384' ? '92px' : '132px';
+  pmcGrid.style.gridTemplateColumns = `36px repeat(${lastConditionCols}, ${cellWidth})`;
+
+  const corner = document.createElement('div');
+  corner.className = 'plate-corner';
+  pmcGrid.appendChild(corner);
+
+  for (let c = 0; c < lastConditionCols; c++) {
+    const label = document.createElement('div');
+    label.className = 'plate-col-label';
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'plate-label-input';
+    const defaultColLabel = String(c + 1);
+    input.value = pmcColLabels[c] || defaultColLabel;
+    input.setAttribute('aria-label', `Column ${defaultColLabel} label`);
+    input.addEventListener('input', () => {
+      pmcColLabels[c] = (input.value === defaultColLabel) ? '' : input.value;
+    });
+    label.appendChild(input);
+    pmcGrid.appendChild(label);
+  }
+
+  for (let r = 0; r < lastConditionRows; r++) {
+    const rowLabel = document.createElement('div');
+    rowLabel.className = 'plate-row-label';
+    const rowInput = document.createElement('input');
+    rowInput.type = 'text';
+    rowInput.className = 'plate-label-input';
+    const defaultRowLabel = rowLetterFromIndex(r);
+    rowInput.value = pmcRowLabels[r] || defaultRowLabel;
+    rowInput.setAttribute('aria-label', `Row ${defaultRowLabel} label`);
+    rowInput.addEventListener('input', () => {
+      pmcRowLabels[r] = (rowInput.value === defaultRowLabel) ? '' : rowInput.value;
+    });
+    rowLabel.appendChild(rowInput);
+    pmcGrid.appendChild(rowLabel);
+
+    for (let c = 0; c < lastConditionCols; c++) {
+      const w = lastConditionWells[r * lastConditionCols + c];
+      const note = pmcWellNotes[w.id] || '';
+      const btn = document.createElement('div');
+      btn.className = 'well';
+      btn.tabIndex = 0;
+
+      if (w.state === 'empty' && !note) btn.classList.add('state-empty');
+
+      const idSpan = document.createElement('span');
+      idSpan.className = 'well-id';
+      idSpan.textContent = w.id;
+      btn.appendChild(idSpan);
+
+      if (w.state === 'entry') {
+        const labelSpan = document.createElement('span');
+        labelSpan.className = 'well-label';
+        labelSpan.textContent = w.label;
+        btn.appendChild(labelSpan);
+      }
+
+      const noteInput = document.createElement('textarea');
+      noteInput.className = 'well-note';
+      noteInput.rows = 1;
+      noteInput.placeholder = 'Note…';
+      noteInput.value = note;
+      noteInput.setAttribute('aria-label', `Note for well ${w.id}`);
+      noteInput.addEventListener('input', () => {
+        const val = noteInput.value;
+        if (val.trim() === '') delete pmcWellNotes[w.id];
+        else pmcWellNotes[w.id] = val;
+        autoSizeWellNote(noteInput);
+      });
+      btn.appendChild(noteInput);
+
+      const tooltip = w.state === 'entry' ? `${w.id}: ${w.label}` : `${w.id}: Empty`;
+      btn.title = tooltip;
+      btn.setAttribute('aria-label', tooltip);
+
+      pmcGrid.appendChild(btn);
+      autoSizeWellNote(noteInput);
+    }
+  }
+}
+
+document.getElementById('pmc-generate').addEventListener('click', () => {
+  hideError(pmcError);
+  try {
+    if (!pmcRows || pmcRows.length === 0) {
+      throw new Error('Upload a spreadsheet first.');
+    }
+
+    const labelColRaw = document.getElementById('pmc-col-label').value.trim();
+    if (labelColRaw === '') throw new Error('Enter the condition/label column letter.');
+    const labelCol = spreadsheetColumnToIndex(labelColRaw);
+
+    const countColRaw = document.getElementById('pmc-col-count').value.trim();
+    const countCol = countColRaw === '' ? null : spreadsheetColumnToIndex(countColRaw);
+
+    const noteColRaw = document.getElementById('pmc-col-note').value.trim();
+    const noteCol = noteColRaw === '' ? null : spreadsheetColumnToIndex(noteColRaw);
+
+    const skipRowsRaw = document.getElementById('pmc-skiprows').value;
+    const skipRows = skipRowsRaw.trim() === '' ? 0 : parseInt(skipRowsRaw, 10);
+    if (!Number.isInteger(skipRows) || skipRows < 0) {
+      throw new Error('"Skip this many rows" must be a whole number of 0 or more.');
+    }
+
+    const entries = mapRowsToConditions(pmcRows, { labelCol, countCol, noteCol }, skipRows);
+
+    const format = pmcCurrentFormat();
+    const direction = pmcCurrentDirection();
+    const startRow = parseInt(document.getElementById('pmc-start-row').value, 10);
+    const startCol = parseInt(document.getElementById('pmc-start-col').value, 10);
+
+    const map = layoutConditionList({ format, direction, startRow, startCol, entries });
+
+    lastConditionWells = map.wells;
+    lastConditionRows = map.rows;
+    lastConditionCols = map.cols;
+    lastConditionFormat = map.format;
+
+    // Pre-fill well notes from the imported note column, without clobbering
+    // any notes the user has since hand-edited for the same well IDs (e.g.
+    // re-generating after fixing a column letter shouldn't wipe edits).
+    map.wells.forEach(w => {
+      if (w.state === 'entry' && w.note && !(w.id in pmcWellNotes)) {
+        pmcWellNotes[w.id] = w.note;
+      }
+    });
+
+    renderConditionGrid();
+
+    const fileName = (document.getElementById('pmc-file').files[0] || {}).name || 'uploaded file';
+    const label = `Condition list: ${entries.length} wells from "${fileName}"`;
+    pushHistory({ tool: 'Plate Map Generator', label, url: window.location.origin + window.location.pathname });
+    renderHistory();
+  } catch (err) {
+    pmcGrid.innerHTML = '';
+    lastConditionWells = null;
+    showError(pmcError, err.message);
+  }
+});
+
+document.getElementById('pmc-reset').addEventListener('click', () => {
+  document.querySelector('#pmc-format-tabs .tab[data-format="96"]').click();
+  document.querySelector('#pmc-direction-tabs .tab[data-direction="down"]').click();
+  document.getElementById('pmc-file').value = '';
+  document.getElementById('pmc-sheet').innerHTML = '';
+  document.getElementById('pmc-sheet-row').style.display = 'none';
+  document.getElementById('pmc-preview-wrap').style.display = 'none';
+  document.getElementById('pmc-preview-table').innerHTML = '';
+  document.getElementById('pmc-skiprows').value = '1';
+  document.getElementById('pmc-col-label').value = '';
+  document.getElementById('pmc-col-count').value = '';
+  document.getElementById('pmc-col-note').value = '';
+  pmcWorkbook = null;
+  pmcRows = null;
+  pmcClearLabelArrays(pmcCurrentFormat());
+  pmcWellNotes = {};
+  hideError(pmcError);
+  pmcGrid.innerHTML = '';
+  lastConditionWells = null;
+});
+
+document.getElementById('pmc-export-csv').addEventListener('click', () => {
+  if (!lastConditionWells) {
+    showError(pmcError, 'Generate a plate plan first, then export.');
+    return;
+  }
+  const rows = [['Well', 'Row', 'Row Label', 'Column', 'Column Label', 'Condition', 'Note']];
+  lastConditionWells.forEach(w => {
+    const rowLabel = pmcRowLabels[w.rowIndex] || rowLetterFromIndex(w.rowIndex);
+    const colLabel = pmcColLabels[w.colIndex] || String(w.colIndex + 1);
+    rows.push([w.id, rowLetterFromIndex(w.rowIndex), rowLabel, w.colIndex + 1, colLabel, w.state === 'entry' ? w.label : '', pmcWellNotes[w.id] || '']);
+  });
+  downloadCSV('condition-plate-plan.csv', rows);
+});
+
+initTheme();
+renderHistory();
+</script>
+</body>
+</html>

@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dilution Toolkit</title>
+<!-- Open Graph — controls the preview card on LinkedIn/WhatsApp/Slack etc. -->
+<meta property="og:title" content="Dilution Toolkit — Lab calculators for biochemistry">
+<meta property="og:description" content="Client-side dilution calculator, stock solution planner, and plate map generator with molecular-weight bridging, CSV export, and dark mode.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://rahichampaneria-hash.github.io/Dilution_Calculator/">
+<link rel="stylesheet" href="shared.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🧪</text></svg>">
+<script>
+// Applied before first paint to avoid a flash of the wrong theme.
+(function() {
+  try {
+    var t = localStorage.getItem('dilutionToolkit.theme');
+    if (!t) {
+      t = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+    }
+    document.documentElement.setAttribute('data-theme', t);
+  } catch (e) {}
+})();
+</script>
+</head>
+<body>
+<header class="navbar">
+  <div class="nav-inner">
+    <a class="nav-brand" href="index.html"><span class="brand-mark">DT</span> Dilution Toolkit</a>
+    <nav class="nav-links">
+      <a href="index.html" aria-current="page">Home</a>
+      <a href="dilution.html">Dilution Calculator</a>
+      <a href="stock-solution.html">Stock Solution Planner</a>
+      <a href="plate-map.html">Plate Map Generator</a>
+      <a href="msd-plate.html">MSD Plate Planner</a>
+    </nav>
+    <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Toggle dark mode">Dark</button>
+  </div>
+</header>
+
+<div class="wrap wrap-top">
+  <div class="tool-grid">
+    <a class="tool-card" href="dilution.html">
+      <span class="tool-kicker">Calculator</span>
+      <h3>Dilution Calculator</h3>
+      <p>Simple C1V1=C2V2 dilutions and multi-step serial dilution series, with molecular-weight unit conversion, variable per-step dilution factors, and a log-scale concentration chart.</p>
+      <span class="tool-cta">Open calculator →</span>
+    </a>
+    <a class="tool-card" href="stock-solution.html">
+      <span class="tool-kicker">Planner</span>
+      <h3>Secondary Stock Planner</h3>
+      <p>Diluting straight to a very low target concentration can mean pipetting an unmeasurably small volume. This tool designs a two-stage dilution so every transfer stays practical.</p>
+      <span class="tool-cta">Open planner →</span>
+    </a>
+    <a class="tool-card" href="plate-map.html">
+      <span class="tool-kicker">Generator</span>
+      <h3>Plate Map Generator</h3>
+      <p>Lay out a serial dilution series across a 96- or 384-well plate, with each well's concentration labeled directly, click-to-mark blank/control wells, freeform well/row/column labels, and CSV export.</p>
+      <span class="tool-cta">Open generator →</span>
+    </a>
+    <a class="tool-card" href="msd-plate.html">
+      <span class="tool-kicker">Planner</span>
+      <h3>MSD Plate Planner</h3>
+      <p>Lay out an MSD 96-well plate: a standard curve plus uploaded samples (CSV or Excel), following conventional MSD assay setup, with freeform well/row/column labels for planning layouts beyond a standard curve.</p>
+      <span class="tool-cta">Open planner →</span>
+    </a>
+  </div>
+
+  <h2 class="section-heading">How to use</h2>
+  <p class="section-sub">Pick a tool above and enter your numbers — every calculator runs entirely in your browser, so there's nothing to install and no login required. Once you have a result, export it as a CSV file or copy a share link that reproduces the exact calculation for a colleague.</p>
+
+  <h2 class="section-heading">What's inside</h2>
+  <p class="section-sub">Every calculator on this site shares these capabilities.</p>
+
+  <div class="feature-grid">
+    <div class="feature-icon">
+      <span class="badge">MW</span>
+      <span class="label">Molecular Weight Support</span>
+      <span class="desc">Convert between molar and mass-based units automatically.</span>
+    </div>
+    <div class="feature-icon">
+      <span class="badge">DF</span>
+      <span class="label">Variable Dilution Factors</span>
+      <span class="desc">Use a different factor at every step of a serial dilution.</span>
+    </div>
+    <div class="feature-icon">
+      <span class="badge">LOG</span>
+      <span class="label">Log-Scale Chart</span>
+      <span class="desc">Visualize concentration drop-off across a dilution series.</span>
+    </div>
+    <div class="feature-icon">
+      <span class="badge">CSV</span>
+      <span class="label">CSV Export</span>
+      <span class="desc">Download any result as a spreadsheet-ready CSV.</span>
+    </div>
+    <div class="feature-icon">
+      <span class="badge">URL</span>
+      <span class="label">Shareable Links</span>
+      <span class="desc">Copy a link that reproduces your exact calculation.</span>
+    </div>
+    <div class="feature-icon">
+      <span class="badge">HIST</span>
+      <span class="label">Calculation History</span>
+      <span class="desc">Revisit recent calculations, saved locally in your browser.</span>
+    </div>
+    <div class="feature-icon">
+      <span class="badge">THEME</span>
+      <span class="label">Dark Mode</span>
+      <span class="desc">Easy on the eyes at the bench — follows your system by default.</span>
+    </div>
+    <div class="feature-icon">
+      <span class="badge">PLATE</span>
+      <span class="label">Plate Map Generator</span>
+      <span class="desc">Visualize a serial dilution series across a 96- or 384-well plate.</span>
+    </div>
+    <div class="feature-icon">
+      <span class="badge">MSD</span>
+      <span class="label">MSD Plate Planner</span>
+      <span class="desc">Standard curve plus uploaded samples, laid out to MSD convention.</span>
+    </div>
+  </div>
+
+  <footer class="page-footer">No accounts, no backend, no data storage — every calculation runs in your browser.</footer>
+</div>
+
+<script src="shared.js"></script>
+<script>
+initTheme();
+</script>
+</body>
+</html>

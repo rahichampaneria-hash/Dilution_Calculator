@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Secondary Stock Solution Planner</title>
+<link rel="stylesheet" href="shared.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🧪</text></svg>">
+<script>
+// Applied before first paint to avoid a flash of the wrong theme.
+(function() {
+  try {
+    var t = localStorage.getItem('dilutionToolkit.theme');
+    if (!t) {
+      t = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+    }
+    document.documentElement.setAttribute('data-theme', t);
+  } catch (e) {}
+})();
+</script>
+</head>
+<body>
+<header class="navbar">
+  <div class="nav-inner">
+    <a class="nav-brand" href="index.html"><span class="brand-mark">DT</span> Dilution Toolkit</a>
+    <nav class="nav-links">
+      <a href="index.html">Home</a>
+      <a href="dilution.html">Dilution Calculator</a>
+      <a href="stock-solution.html" aria-current="page">Stock Solution Planner</a>
+      <a href="plate-map.html">Plate Map Generator</a>
+      <a href="msd-plate.html">MSD Plate Planner</a>
+    </nav>
+    <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Toggle dark mode">Dark</button>
+  </div>
+</header>
+
+<div class="wrap">
+  <header class="page-header">
+    <h1>Secondary Stock Solution Planner</h1>
+    <p>For when a target concentration is so low that diluting straight from your primary stock would mean pipetting an unmeasurably small volume.</p>
+  </header>
+
+  <section class="panel active">
+    <h2>Plan a dilution</h2>
+    <p class="panel-sub">Enter your primary stock, your target concentration, and how much final solution you need. If a direct dilution would require pipetting less than your minimum comfortable volume, this tool designs an intermediate ("secondary") stock so every transfer stays practical.</p>
+
+    <div class="field-row">
+      <div class="field">
+        <label for="ss-c1">Primary stock concentration (C1)</label>
+        <input type="number" id="ss-c1" placeholder="e.g. 1" step="any" min="0">
+      </div>
+      <div class="field">
+        <label for="ss-c1-unit">Unit</label>
+        <select id="ss-c1-unit">
+          <option value="nM">nM</option>
+          <option value="µM">µM</option>
+          <option value="mM">mM</option>
+          <option value="M" selected>M</option>
+          <option value="ng/mL">ng/mL</option>
+          <option value="µg/mL">µg/mL</option>
+          <option value="mg/mL">mg/mL</option>
+          <option value="pg/mL">pg/mL</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="field-row">
+      <div class="field">
+        <label for="ss-c2">Target (final) concentration (C2)</label>
+        <input type="number" id="ss-c2" placeholder="e.g. 1" step="any" min="0">
+      </div>
+      <div class="field">
+        <label for="ss-c2-unit">Unit</label>
+        <select id="ss-c2-unit">
+          <option value="nM">nM</option>
+          <option value="µM" selected>µM</option>
+          <option value="mM">mM</option>
+          <option value="M">M</option>
+          <option value="ng/mL">ng/mL</option>
+          <option value="µg/mL">µg/mL</option>
+          <option value="mg/mL">mg/mL</option>
+          <option value="pg/mL">pg/mL</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="field-row">
+      <div class="field">
+        <label for="ss-fv">Final volume to prepare</label>
+        <input type="number" id="ss-fv" placeholder="e.g. 1" step="any" min="0">
+      </div>
+      <div class="field">
+        <label for="ss-fv-unit">Unit</label>
+        <select id="ss-fv-unit">
+          <option value="µL">µL</option>
+          <option value="mL" selected>mL</option>
+          <option value="L">L</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="field-row">
+      <div class="field">
+        <label for="ss-iv">Secondary stock volume to prepare (if needed)</label>
+        <input type="number" id="ss-iv" value="1" step="any" min="0">
+      </div>
+      <div class="field">
+        <label for="ss-iv-unit">Unit</label>
+        <select id="ss-iv-unit">
+          <option value="µL">µL</option>
+          <option value="mL" selected>mL</option>
+          <option value="L">L</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="field-row">
+      <div class="field">
+        <label for="ss-minp">Minimum comfortable pipetting volume</label>
+        <input type="number" id="ss-minp" value="2" step="any" min="0">
+      </div>
+      <div class="field">
+        <label for="ss-minp-unit">Unit</label>
+        <select id="ss-minp-unit">
+          <option value="µL" selected>µL</option>
+          <option value="mL">mL</option>
+          <option value="L">L</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="field-row" style="grid-template-columns:1fr;">
+      <div class="field">
+        <label for="ss-mw">Molecular weight (g/mol) — optional</label>
+        <input type="number" id="ss-mw" placeholder="e.g. 180.16 (glucose) — only needed if C1/C2 use different unit families" step="any" min="0">
+      </div>
+    </div>
+
+    <p class="hint">If a single direct dilution keeps the transfer volume at or above your minimum, this tool just gives you that — no secondary stock needed. Otherwise it splits the dilution evenly across two stages.</p>
+
+    <div class="btn-row">
+      <button class="primary" type="button" id="ss-calc">Calculate</button>
+      <button class="secondary" type="button" id="ss-reset">Reset</button>
+      <button class="btn-icon" type="button" id="ss-export-csv">Export CSV</button>
+      <button class="btn-icon" type="button" id="ss-share">Copy link</button>
+    </div>
+    <p class="hint" id="ss-share-url"></p>
+
+    <div class="error-box" id="ss-error"></div>
+    <div class="warn-box" id="ss-warn"></div>
+
+    <div class="result-box" id="ss-result-direct">
+      <h3>Direct dilution works</h3>
+      <p class="panel-sub" style="margin-bottom:10px;">Your target transfer volume stays at or above your minimum pipetting volume — no secondary stock needed.</p>
+      <div class="result-line"><span>Volume of primary stock to add</span><span class="value" id="ss-direct-v1">—</span></div>
+      <div class="result-line"><span>Volume of diluent to add</span><span class="value" id="ss-direct-diluent">—</span></div>
+    </div>
+
+    <div class="result-box" id="ss-result-twostage">
+      <h3>Two-stage dilution recipe</h3>
+      <div class="stage-label">Step 1 — Make the secondary stock</div>
+      <div class="result-line"><span>Secondary stock concentration</span><span class="value" id="ss-mid-conc">—</span></div>
+      <div class="result-line"><span>Volume of primary stock to add</span><span class="value" id="ss-t1">—</span></div>
+      <div class="result-line"><span>Volume of diluent to add</span><span class="value" id="ss-d1">—</span></div>
+      <div class="stage-label">Step 2 — Dilute the secondary stock to your final target</div>
+      <div class="result-line"><span>Volume of secondary stock to add</span><span class="value" id="ss-t2">—</span></div>
+      <div class="result-line"><span>Volume of diluent to add</span><span class="value" id="ss-d2">—</span></div>
+    </div>
+  </section>
+
+  <section class="history-panel">
+    <div class="history-panel-head">
+      <h2>Recent calculations</h2>
+      <button class="btn-icon" type="button" id="history-clear">Clear history</button>
+    </div>
+    <ul class="history-list" id="history-list"></ul>
+    <p class="history-empty" id="history-empty">No calculations yet — your recent results will appear here.</p>
+  </section>
+
+  <footer class="page-footer">No accounts, no backend, no data storage — every calculation runs in your browser.</footer>
+</div>
+
+<script src="shared.js"></script>
+<script>
+/* =========================================================================
+   DOM BINDINGS
+   ========================================================================= */
+
+function showError(box, message) {
+  box.textContent = message;
+  box.classList.add('show');
+}
+function hideError(box) {
+  box.classList.remove('show');
+  box.textContent = '';
+}
+function flashButton(btn, text, revertText) {
+  const original = revertText || btn.textContent;
+  btn.textContent = text;
+  setTimeout(() => { btn.textContent = original; }, 1600);
+}
+function renderHistory() {
+  const list = getHistory();
+  const listEl = document.getElementById('history-list');
+  const emptyEl = document.getElementById('history-empty');
+  listEl.innerHTML = '';
+  if (list.length === 0) {
+    emptyEl.style.display = 'block';
+    return;
+  }
+  emptyEl.style.display = 'none';
+  list.forEach(entry => {
+    const li = document.createElement('li');
+    const a = document.createElement('a');
+    a.className = 'history-item';
+    a.href = entry.url;
+    a.innerHTML = `${entry.label}<span class="ts">${new Date(entry.ts).toLocaleString()}</span>`;
+    li.appendChild(a);
+    listEl.appendChild(li);
+  });
+}
+document.getElementById('history-clear').addEventListener('click', () => {
+  clearHistory();
+  renderHistory();
+});
+
+const ssError = document.getElementById('ss-error');
+const ssWarn = document.getElementById('ss-warn');
+const ssResultDirect = document.getElementById('ss-result-direct');
+const ssResultTwoStage = document.getElementById('ss-result-twostage');
+let lastStockResult = null;
+
+function buildStockParams() {
+  return {
+    c1: document.getElementById('ss-c1').value,
+    c1u: document.getElementById('ss-c1-unit').value,
+    c2: document.getElementById('ss-c2').value,
+    c2u: document.getElementById('ss-c2-unit').value,
+    fv: document.getElementById('ss-fv').value,
+    fvu: document.getElementById('ss-fv-unit').value,
+    iv: document.getElementById('ss-iv').value,
+    ivu: document.getElementById('ss-iv-unit').value,
+    minp: document.getElementById('ss-minp').value,
+    minpu: document.getElementById('ss-minp-unit').value,
+    mw: document.getElementById('ss-mw').value
+  };
+}
+
+document.getElementById('ss-calc').addEventListener('click', () => {
+  hideError(ssError);
+  hideError(ssWarn);
+  ssResultDirect.classList.remove('show');
+  ssResultTwoStage.classList.remove('show');
+
+  const c1 = parseFloat(document.getElementById('ss-c1').value);
+  const c1Unit = document.getElementById('ss-c1-unit').value;
+  const c2 = parseFloat(document.getElementById('ss-c2').value);
+  const c2Unit = document.getElementById('ss-c2-unit').value;
+  const finalVolume = parseFloat(document.getElementById('ss-fv').value);
+  const finalVolumeUnit = document.getElementById('ss-fv-unit').value;
+  const intermediateVolume = parseFloat(document.getElementById('ss-iv').value);
+  const intermediateVolumeUnit = document.getElementById('ss-iv-unit').value;
+  const minPipetteVolume = parseFloat(document.getElementById('ss-minp').value);
+  const minPipetteVolumeUnit = document.getElementById('ss-minp-unit').value;
+  const mwRaw = document.getElementById('ss-mw').value;
+  const mwGramsPerMol = mwRaw.trim() === '' ? undefined : parseFloat(mwRaw);
+
+  try {
+    if (document.getElementById('ss-c1').value.trim() === '' ||
+        document.getElementById('ss-c2').value.trim() === '' ||
+        document.getElementById('ss-fv').value.trim() === '' ||
+        document.getElementById('ss-iv').value.trim() === '' ||
+        document.getElementById('ss-minp').value.trim() === '') {
+      throw new Error('Please fill in all fields before calculating.');
+    }
+
+    const result = secondaryStockDilution({
+      c1, c1Unit, c2, c2Unit,
+      finalVolume, finalVolumeUnit,
+      intermediateVolume, intermediateVolumeUnit,
+      minPipetteVolume, minPipetteVolumeUnit,
+      mwGramsPerMol
+    });
+
+    let historyLabel;
+
+    if (result.mode === 'direct') {
+      document.getElementById('ss-direct-v1').textContent = `${formatNumber(result.v1Value)} ${result.v1Unit}`;
+      document.getElementById('ss-direct-diluent').textContent = `${formatNumber(result.diluentValue)} ${result.diluentUnit}`;
+      ssResultDirect.classList.add('show');
+      historyLabel = `Direct: ${formatNumber(c1)} ${c1Unit} → ${formatNumber(c2)} ${c2Unit} in ${formatNumber(finalVolume)} ${finalVolumeUnit}`;
+    } else {
+      document.getElementById('ss-mid-conc').textContent = `${formatNumber(result.secondaryStockConcValue)} ${result.secondaryStockConcUnit}`;
+      document.getElementById('ss-t1').textContent = `${formatNumber(result.transfer1Value)} ${result.transfer1Unit}`;
+      document.getElementById('ss-d1').textContent = `${formatNumber(result.diluent1Value)} ${result.diluent1Unit}`;
+      document.getElementById('ss-t2').textContent = `${formatNumber(result.transfer2Value)} ${result.transfer2Unit}`;
+      document.getElementById('ss-d2').textContent = `${formatNumber(result.diluent2Value)} ${result.diluent2Unit}`;
+      ssResultTwoStage.classList.add('show');
+      historyLabel = `Two-stage: ${formatNumber(c1)} ${c1Unit} → ${formatNumber(c2)} ${c2Unit} in ${formatNumber(finalVolume)} ${finalVolumeUnit}`;
+
+      if (result.warnings && result.warnings.length > 0) {
+        ssWarn.innerHTML = '<strong>Heads up:</strong><ul>' + result.warnings.map(w => `<li>${w}</li>`).join('') + '</ul>';
+        ssWarn.classList.add('show');
+      }
+    }
+
+    lastStockResult = result;
+    pushHistory({
+      tool: 'Stock Solution Planner',
+      label: historyLabel,
+      url: buildShareURL(buildStockParams())
+    });
+    renderHistory();
+  } catch (err) {
+    showError(ssError, err.message);
+  }
+});
+
+document.getElementById('ss-reset').addEventListener('click', () => {
+  document.getElementById('ss-c1').value = '';
+  document.getElementById('ss-c2').value = '';
+  document.getElementById('ss-fv').value = '';
+  document.getElementById('ss-iv').value = '1';
+  document.getElementById('ss-minp').value = '2';
+  document.getElementById('ss-mw').value = '';
+  document.getElementById('ss-share-url').textContent = '';
+  hideError(ssError);
+  hideError(ssWarn);
+  ssResultDirect.classList.remove('show');
+  ssResultTwoStage.classList.remove('show');
+  lastStockResult = null;
+});
+
+document.getElementById('ss-export-csv').addEventListener('click', () => {
+  if (!lastStockResult) {
+    showError(ssError, 'Calculate a result first, then export.');
+    return;
+  }
+  const rows = [['Field', 'Value']];
+  rows.push(['Primary stock concentration (C1)', `${document.getElementById('ss-c1').value} ${document.getElementById('ss-c1-unit').value}`]);
+  rows.push(['Target concentration (C2)', `${document.getElementById('ss-c2').value} ${document.getElementById('ss-c2-unit').value}`]);
+  rows.push(['Final volume', `${document.getElementById('ss-fv').value} ${document.getElementById('ss-fv-unit').value}`]);
+  rows.push(['Molecular weight (g/mol)', document.getElementById('ss-mw').value]);
+
+  if (lastStockResult.mode === 'direct') {
+    rows.push(['Mode', 'Direct dilution']);
+    rows.push(['Volume of primary stock to add', document.getElementById('ss-direct-v1').textContent]);
+    rows.push(['Volume of diluent to add', document.getElementById('ss-direct-diluent').textContent]);
+  } else {
+    rows.push(['Mode', 'Two-stage dilution']);
+    rows.push(['Secondary stock concentration', document.getElementById('ss-mid-conc').textContent]);
+    rows.push(['Step 1: Volume of primary stock to add', document.getElementById('ss-t1').textContent]);
+    rows.push(['Step 1: Volume of diluent to add', document.getElementById('ss-d1').textContent]);
+    rows.push(['Step 2: Volume of secondary stock to add', document.getElementById('ss-t2').textContent]);
+    rows.push(['Step 2: Volume of diluent to add', document.getElementById('ss-d2').textContent]);
+    if (lastStockResult.warnings && lastStockResult.warnings.length) {
+      rows.push(['Warnings', lastStockResult.warnings.join(' | ')]);
+    }
+  }
+  downloadCSV('secondary-stock-plan.csv', rows);
+});
+
+document.getElementById('ss-share').addEventListener('click', () => {
+  const url = buildShareURL(buildStockParams());
+  document.getElementById('ss-share-url').textContent = 'Shareable link: ' + url;
+  copyToClipboard(url).then(ok => {
+    flashButton(document.getElementById('ss-share'), ok ? 'Copied!' : 'Copy link', 'Copy link');
+  });
+});
+
+// --- Share-link loader ---
+(function loadFromShareParams() {
+  const params = parseShareParams();
+  if (!params.has('c1') && !params.has('c2')) return;
+
+  if (params.has('c1')) document.getElementById('ss-c1').value = params.get('c1');
+  if (params.has('c1u')) document.getElementById('ss-c1-unit').value = params.get('c1u');
+  if (params.has('c2')) document.getElementById('ss-c2').value = params.get('c2');
+  if (params.has('c2u')) document.getElementById('ss-c2-unit').value = params.get('c2u');
+  if (params.has('fv')) document.getElementById('ss-fv').value = params.get('fv');
+  if (params.has('fvu')) document.getElementById('ss-fv-unit').value = params.get('fvu');
+  if (params.has('iv')) document.getElementById('ss-iv').value = params.get('iv');
+  if (params.has('ivu')) document.getElementById('ss-iv-unit').value = params.get('ivu');
+  if (params.has('minp')) document.getElementById('ss-minp').value = params.get('minp');
+  if (params.has('minpu')) document.getElementById('ss-minp-unit').value = params.get('minpu');
+  if (params.has('mw')) document.getElementById('ss-mw').value = params.get('mw');
+
+  document.getElementById('ss-calc').click();
+})();
+
+initTheme();
+renderHistory();
+</script>
+</body>
+</html>

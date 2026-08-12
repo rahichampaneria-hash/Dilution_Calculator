@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dilution Calculator</title>
+<link rel="stylesheet" href="shared.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🧪</text></svg>">
+<script>
+// Applied before first paint to avoid a flash of the wrong theme.
+(function() {
+  try {
+    var t = localStorage.getItem('dilutionToolkit.theme');
+    if (!t) {
+      t = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+    }
+    document.documentElement.setAttribute('data-theme', t);
+  } catch (e) {}
+})();
+</script>
+</head>
+<body>
+<header class="navbar">
+  <div class="nav-inner">
+    <a class="nav-brand" href="index.html"><span class="brand-mark">DT</span> Dilution Toolkit</a>
+    <nav class="nav-links">
+      <a href="index.html">Home</a>
+      <a href="dilution.html" aria-current="page">Dilution Calculator</a>
+      <a href="stock-solution.html">Stock Solution Planner</a>
+      <a href="plate-map.html">Plate Map Generator</a>
+      <a href="msd-plate.html">MSD Plate Planner</a>
+    </nav>
+    <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Toggle dark mode">Dark</button>
+  </div>
+</header>
+
+<div class="wrap">
+  <header class="page-header">
+    <h1>Serial Dilution Calculator</h1>
+    <p>Simple C1V1=C2V2 dilutions and multi-step serial dilution series — all calculated client-side.</p>
+  </header>
+
+  <div class="tabs">
+    <button class="tab active" data-mode="simple" type="button">Simple Dilution</button>
+    <button class="tab" data-mode="serial" type="button">Serial Dilution Series</button>
+  </div>
+
+  <!-- ================= SIMPLE DILUTION PANEL ================= -->
+  <section class="panel active" id="simple-panel">
+    <h2>Simple Dilution (C1V1 = C2V2)</h2>
+    <p class="panel-sub">Enter your stock concentration, the concentration you want, and the final volume to prepare.</p>
+
+    <div class="field-row">
+      <div class="field">
+        <label for="s-c1">Stock concentration (C1)</label>
+        <input type="number" id="s-c1" placeholder="e.g. 10" step="any" min="0">
+      </div>
+      <div class="field">
+        <label for="s-c1-unit">Unit</label>
+        <select id="s-c1-unit">
+          <option value="nM">nM</option>
+          <option value="µM">µM</option>
+          <option value="mM" selected>mM</option>
+          <option value="M">M</option>
+          <option value="ng/mL">ng/mL</option>
+          <option value="µg/mL">µg/mL</option>
+          <option value="mg/mL">mg/mL</option>
+          <option value="pg/mL">pg/mL</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="field-row">
+      <div class="field">
+        <label for="s-c2">Desired final concentration (C2)</label>
+        <input type="number" id="s-c2" placeholder="e.g. 1" step="any" min="0">
+      </div>
+      <div class="field">
+        <label for="s-c2-unit">Unit</label>
+        <select id="s-c2-unit">
+          <option value="nM">nM</option>
+          <option value="µM">µM</option>
+          <option value="mM" selected>mM</option>
+          <option value="M">M</option>
+          <option value="ng/mL">ng/mL</option>
+          <option value="µg/mL">µg/mL</option>
+          <option value="mg/mL">mg/mL</option>
+          <option value="pg/mL">pg/mL</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="field-row">
+      <div class="field">
+        <label for="s-v2">Final volume (V2)</label>
+        <input type="number" id="s-v2" placeholder="e.g. 5" step="any" min="0">
+      </div>
+      <div class="field">
+        <label for="s-v2-unit">Unit</label>
+        <select id="s-v2-unit">
+          <option value="µL">µL</option>
+          <option value="mL" selected>mL</option>
+          <option value="L">L</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="field-row" style="grid-template-columns:1fr;">
+      <div class="field">
+        <label for="s-mw">Molecular weight (g/mol) — optional</label>
+        <input type="number" id="s-mw" placeholder="e.g. 180.16 (glucose) — only needed if C1/C2 use different unit families" step="any" min="0">
+      </div>
+    </div>
+
+    <p class="hint">Note: stock and final concentration must use units from the same family (both molar-based, e.g. nM–M, or both mass-based, e.g. ng/mL–mg/mL) unless you enter the molecular weight above, which lets the calculator convert between them.</p>
+
+    <div class="btn-row">
+      <button class="primary" type="button" id="s-calc">Calculate</button>
+      <button class="secondary" type="button" id="s-reset">Reset</button>
+      <button class="btn-icon" type="button" id="s-export-csv">Export CSV</button>
+      <button class="btn-icon" type="button" id="s-share">Copy link</button>
+    </div>
+    <p class="hint" id="s-share-url"></p>
+
+    <div class="error-box" id="s-error"></div>
+
+    <div class="result-box" id="s-result">
+      <h3>Result</h3>
+      <div class="result-line"><span>Volume of stock to add (V1)</span><span class="value" id="s-v1-out">—</span></div>
+      <div class="result-line"><span>Volume of diluent to add</span><span class="value" id="s-diluent-out">—</span></div>
+    </div>
+  </section>
+
+  <!-- ================= SERIAL DILUTION PANEL ================= -->
+  <section class="panel" id="serial-panel">
+    <h2>Serial Dilution Series</h2>
+    <p class="panel-sub">Enter your starting concentration, the dilution factor per step, how many steps, and the volume to prepare at each step.</p>
+
+    <div class="field-row">
+      <div class="field">
+        <label for="d-stock">Stock concentration</label>
+        <input type="number" id="d-stock" placeholder="e.g. 1" step="any" min="0">
+      </div>
+      <div class="field">
+        <label for="d-stock-unit">Unit</label>
+        <select id="d-stock-unit">
+          <option value="nM">nM</option>
+          <option value="µM">µM</option>
+          <option value="mM" selected>mM</option>
+          <option value="M">M</option>
+          <option value="ng/mL">ng/mL</option>
+          <option value="µg/mL">µg/mL</option>
+          <option value="mg/mL">mg/mL</option>
+          <option value="pg/mL">pg/mL</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="mode-tabs" id="d-mode-tabs">
+      <button class="tab active" data-factormode="constant" type="button">Constant factor</button>
+      <button class="tab" data-factormode="variable" type="button">Variable per-step factors</button>
+    </div>
+
+    <div id="d-constant-fields">
+      <div class="field-row">
+        <div class="field">
+          <label for="d-factor">Dilution factor (e.g. 2 for 1:2, 10 for 1:10)</label>
+          <input type="number" id="d-factor" placeholder="e.g. 10" step="any" min="1">
+        </div>
+        <div class="field" style="min-width:0"></div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="d-steps">Number of steps (N)</label>
+          <input type="number" id="d-steps" placeholder="e.g. 5" step="1" min="1">
+        </div>
+        <div class="field" style="min-width:0"></div>
+      </div>
+    </div>
+
+    <div id="d-variable-fields" style="display:none;">
+      <div class="field-row" style="grid-template-columns:1fr;">
+        <div class="field">
+          <label for="d-factors">Dilution factors, one per step (comma-separated, e.g. 2,5,10,10,2)</label>
+          <input type="text" id="d-factors" placeholder="e.g. 2,5,10,10,2">
+        </div>
+      </div>
+      <p class="hint">The number of steps is taken from how many factors you enter — no need to set it separately.</p>
+    </div>
+
+    <div class="field-row">
+      <div class="field">
+        <label for="d-volume">Volume to prepare per step</label>
+        <input type="number" id="d-volume" placeholder="e.g. 1" step="any" min="0">
+      </div>
+      <div class="field">
+        <label for="d-volume-unit">Unit</label>
+        <select id="d-volume-unit">
+          <option value="µL">µL</option>
+          <option value="mL" selected>mL</option>
+          <option value="L">L</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="primary" type="button" id="d-calc">Calculate</button>
+      <button class="secondary" type="button" id="d-reset">Reset</button>
+      <button class="btn-icon" type="button" id="d-export-csv">Export CSV</button>
+      <button class="btn-icon" type="button" id="d-share">Copy link</button>
+    </div>
+    <p class="hint" id="d-share-url"></p>
+
+    <div class="error-box" id="d-error"></div>
+
+    <div class="table-scroll" id="d-table-wrap" style="display:none;">
+      <table>
+        <thead>
+          <tr>
+            <th>Step</th>
+            <th>Dilution factor</th>
+            <th>Concentration</th>
+            <th>Transfer volume</th>
+            <th>Diluent volume</th>
+          </tr>
+        </thead>
+        <tbody id="d-table-body"></tbody>
+      </table>
+    </div>
+
+    <div class="chart-container" id="d-chart"></div>
+  </section>
+
+  <section class="history-panel">
+    <div class="history-panel-head">
+      <h2>Recent calculations</h2>
+      <button class="btn-icon" type="button" id="history-clear">Clear history</button>
+    </div>
+    <ul class="history-list" id="history-list"></ul>
+    <p class="history-empty" id="history-empty">No calculations yet — your recent results will appear here.</p>
+  </section>
+
+  <footer class="page-footer">No accounts, no backend, no data storage — every calculation runs in your browser.</footer>
+</div>
+
+<script src="shared.js"></script>
+<script>
+/* =========================================================================
+   DOM BINDINGS
+   Wires the calculation engine (shared.js) to this page.
+   ========================================================================= */
+
+function showError(box, message) {
+  box.textContent = message;
+  box.classList.add('show');
+}
+function hideError(box) {
+  box.classList.remove('show');
+  box.textContent = '';
+}
+function flashButton(btn, text, revertText) {
+  const original = revertText || btn.textContent;
+  btn.textContent = text;
+  setTimeout(() => { btn.textContent = original; }, 1600);
+}
+function renderHistory() {
+  const list = getHistory();
+  const listEl = document.getElementById('history-list');
+  const emptyEl = document.getElementById('history-empty');
+  listEl.innerHTML = '';
+  if (list.length === 0) {
+    emptyEl.style.display = 'block';
+    return;
+  }
+  emptyEl.style.display = 'none';
+  list.forEach(entry => {
+    const li = document.createElement('li');
+    const a = document.createElement('a');
+    a.className = 'history-item';
+    a.href = entry.url;
+    a.innerHTML = `${entry.label}<span class="ts">${new Date(entry.ts).toLocaleString()}</span>`;
+    li.appendChild(a);
+    listEl.appendChild(li);
+  });
+}
+document.getElementById('history-clear').addEventListener('click', () => {
+  clearHistory();
+  renderHistory();
+});
+
+// --- Top-level tab switching (Simple / Serial) ---
+document.querySelectorAll('.wrap > .tabs .tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.wrap > .tabs .tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById(tab.dataset.mode + '-panel').classList.add('active');
+  });
+});
+
+/* ------------------------- Simple Dilution ------------------------- */
+
+const sError = document.getElementById('s-error');
+const sResult = document.getElementById('s-result');
+
+function buildSimpleParams() {
+  return {
+    tab: 'simple',
+    c1: document.getElementById('s-c1').value,
+    c1u: document.getElementById('s-c1-unit').value,
+    c2: document.getElementById('s-c2').value,
+    c2u: document.getElementById('s-c2-unit').value,
+    v2: document.getElementById('s-v2').value,
+    v2u: document.getElementById('s-v2-unit').value,
+    mw: document.getElementById('s-mw').value
+  };
+}
+
+document.getElementById('s-calc').addEventListener('click', () => {
+  hideError(sError);
+  sResult.classList.remove('show');
+
+  const c1 = parseFloat(document.getElementById('s-c1').value);
+  const c1Unit = document.getElementById('s-c1-unit').value;
+  const c2 = parseFloat(document.getElementById('s-c2').value);
+  const c2Unit = document.getElementById('s-c2-unit').value;
+  const v2 = parseFloat(document.getElementById('s-v2').value);
+  const v2Unit = document.getElementById('s-v2-unit').value;
+  const mwRaw = document.getElementById('s-mw').value;
+  const mw = mwRaw.trim() === '' ? undefined : parseFloat(mwRaw);
+
+  try {
+    if (document.getElementById('s-c1').value.trim() === '' ||
+        document.getElementById('s-c2').value.trim() === '' ||
+        document.getElementById('s-v2').value.trim() === '') {
+      throw new Error('Please fill in all fields before calculating.');
+    }
+
+    const c2InC1Units = convertConcentrationFlexible(c2, c2Unit, c1Unit, mw);
+    const result = simpleDilution({ c1, c1Unit, c2: c2InC1Units, c2Unit: c1Unit, v2, v2Unit });
+
+    document.getElementById('s-v1-out').textContent =
+      `${formatNumber(result.v1Value)} ${result.v1Unit}`;
+    document.getElementById('s-diluent-out').textContent =
+      `${formatNumber(result.diluentValue)} ${result.diluentUnit}`;
+
+    sResult.classList.add('show');
+
+    const shareParams = buildSimpleParams();
+    pushHistory({
+      tool: 'Dilution Calculator',
+      label: `Simple: ${formatNumber(c1)} ${c1Unit} → ${formatNumber(c2)} ${c2Unit} in ${formatNumber(v2)} ${v2Unit}`,
+      url: buildShareURL(shareParams)
+    });
+    renderHistory();
+  } catch (err) {
+    showError(sError, err.message);
+  }
+});
+
+document.getElementById('s-reset').addEventListener('click', () => {
+  document.getElementById('s-c1').value = '';
+  document.getElementById('s-c2').value = '';
+  document.getElementById('s-v2').value = '';
+  document.getElementById('s-mw').value = '';
+  document.getElementById('s-share-url').textContent = '';
+  hideError(sError);
+  sResult.classList.remove('show');
+});
+
+document.getElementById('s-export-csv').addEventListener('click', () => {
+  if (!sResult.classList.contains('show')) {
+    showError(sError, 'Calculate a result first, then export.');
+    return;
+  }
+  downloadCSV('simple-dilution.csv', [
+    ['Field', 'Value'],
+    ['Stock concentration (C1)', `${document.getElementById('s-c1').value} ${document.getElementById('s-c1-unit').value}`],
+    ['Desired final concentration (C2)', `${document.getElementById('s-c2').value} ${document.getElementById('s-c2-unit').value}`],
+    ['Final volume (V2)', `${document.getElementById('s-v2').value} ${document.getElementById('s-v2-unit').value}`],
+    ['Molecular weight (g/mol)', document.getElementById('s-mw').value],
+    ['Volume of stock to add (V1)', document.getElementById('s-v1-out').textContent],
+    ['Volume of diluent to add', document.getElementById('s-diluent-out').textContent]
+  ]);
+});
+
+document.getElementById('s-share').addEventListener('click', () => {
+  const url = buildShareURL(buildSimpleParams());
+  document.getElementById('s-share-url').textContent = 'Shareable link: ' + url;
+  copyToClipboard(url).then(ok => {
+    flashButton(document.getElementById('s-share'), ok ? 'Copied!' : 'Copy link', 'Copy link');
+  });
+});
+
+/* ------------------------- Serial Dilution ------------------------- */
+
+const dError = document.getElementById('d-error');
+const dTableWrap = document.getElementById('d-table-wrap');
+const dTableBody = document.getElementById('d-table-body');
+const dChart = document.getElementById('d-chart');
+let lastSerialRows = null;
+
+document.querySelectorAll('#d-mode-tabs .tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('#d-mode-tabs .tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    const mode = tab.dataset.factormode;
+    document.getElementById('d-constant-fields').style.display = mode === 'constant' ? 'block' : 'none';
+    document.getElementById('d-variable-fields').style.display = mode === 'variable' ? 'block' : 'none';
+  });
+});
+
+function currentFactorMode() {
+  return document.querySelector('#d-mode-tabs .tab.active').dataset.factormode;
+}
+
+function buildSerialParams() {
+  const factorMode = currentFactorMode();
+  const params = {
+    tab: 'serial',
+    fmode: factorMode,
+    stock: document.getElementById('d-stock').value,
+    stocku: document.getElementById('d-stock-unit').value,
+    vol: document.getElementById('d-volume').value,
+    volu: document.getElementById('d-volume-unit').value
+  };
+  if (factorMode === 'constant') {
+    params.factor = document.getElementById('d-factor').value;
+    params.steps = document.getElementById('d-steps').value;
+  } else {
+    params.factors = document.getElementById('d-factors').value;
+  }
+  return params;
+}
+
+document.getElementById('d-calc').addEventListener('click', () => {
+  hideError(dError);
+  dTableWrap.style.display = 'none';
+  dTableBody.innerHTML = '';
+  dChart.innerHTML = '';
+
+  const stock = parseFloat(document.getElementById('d-stock').value);
+  const stockUnit = document.getElementById('d-stock-unit').value;
+  const stepVolume = parseFloat(document.getElementById('d-volume').value);
+  const stepVolumeUnit = document.getElementById('d-volume-unit').value;
+  const factorMode = currentFactorMode();
+
+  try {
+    if (document.getElementById('d-stock').value.trim() === '' ||
+        document.getElementById('d-volume').value.trim() === '') {
+      throw new Error('Please fill in all fields before calculating.');
+    }
+
+    let rows;
+    let historyLabel;
+
+    if (factorMode === 'constant') {
+      if (document.getElementById('d-factor').value.trim() === '' ||
+          document.getElementById('d-steps').value.trim() === '') {
+        throw new Error('Please fill in all fields before calculating.');
+      }
+      const dilutionFactor = parseFloat(document.getElementById('d-factor').value);
+      // parseFloat (not parseInt) so a non-integer entry like "2.5" fails
+      // serialDilution's integer check instead of silently truncating to 2.
+      const steps = parseFloat(document.getElementById('d-steps').value);
+      rows = serialDilution({ stock, stockUnit, dilutionFactor, steps, stepVolume, stepVolumeUnit });
+      historyLabel = `Serial: ${formatNumber(stock)} ${stockUnit}, ${formatNumber(dilutionFactor)}× per step, ${steps} steps`;
+    } else {
+      const factorsRaw = document.getElementById('d-factors').value;
+      if (factorsRaw.trim() === '') {
+        throw new Error('Enter at least one dilution factor.');
+      }
+      const factors = factorsRaw.split(',').map(s => s.trim()).filter(s => s !== '').map(Number);
+      if (factors.some(f => Number.isNaN(f))) {
+        throw new Error("Check your comma-separated list of dilution factors — one of the entries isn't a valid number.");
+      }
+      rows = serialDilutionVariable({ stock, stockUnit, factors, stepVolume, stepVolumeUnit });
+      historyLabel = `Serial: ${formatNumber(stock)} ${stockUnit}, variable factors, ${rows.length} steps`;
+    }
+
+    rows.forEach(row => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${row.step}</td>
+        <td>${formatNumber(row.factor)}×</td>
+        <td>${formatNumber(row.concValue)} ${row.concUnit}</td>
+        <td>${formatNumber(row.transferValue)} ${row.transferUnit}</td>
+        <td>${formatNumber(row.diluentValue)} ${row.diluentUnit}</td>
+      `;
+      dTableBody.appendChild(tr);
+    });
+
+    dTableWrap.style.display = 'block';
+    dChart.innerHTML = buildConcentrationChartSVG(rows);
+
+    lastSerialRows = rows;
+    pushHistory({
+      tool: 'Dilution Calculator',
+      label: historyLabel,
+      url: buildShareURL(buildSerialParams())
+    });
+    renderHistory();
+  } catch (err) {
+    showError(dError, err.message);
+  }
+});
+
+document.getElementById('d-reset').addEventListener('click', () => {
+  document.getElementById('d-stock').value = '';
+  document.getElementById('d-factor').value = '';
+  document.getElementById('d-steps').value = '';
+  document.getElementById('d-factors').value = '';
+  document.getElementById('d-volume').value = '';
+  document.getElementById('d-share-url').textContent = '';
+  hideError(dError);
+  dTableWrap.style.display = 'none';
+  dTableBody.innerHTML = '';
+  dChart.innerHTML = '';
+  lastSerialRows = null;
+});
+
+document.getElementById('d-export-csv').addEventListener('click', () => {
+  if (!lastSerialRows) {
+    showError(dError, 'Calculate a result first, then export.');
+    return;
+  }
+  const rows = [['Step', 'Dilution factor', 'Concentration', 'Transfer volume', 'Diluent volume']];
+  lastSerialRows.forEach(r => {
+    rows.push([
+      r.step,
+      `${formatNumber(r.factor)}x`,
+      `${formatNumber(r.concValue)} ${r.concUnit}`,
+      `${formatNumber(r.transferValue)} ${r.transferUnit}`,
+      `${formatNumber(r.diluentValue)} ${r.diluentUnit}`
+    ]);
+  });
+  downloadCSV('serial-dilution.csv', rows);
+});
+
+document.getElementById('d-share').addEventListener('click', () => {
+  const url = buildShareURL(buildSerialParams());
+  document.getElementById('d-share-url').textContent = 'Shareable link: ' + url;
+  copyToClipboard(url).then(ok => {
+    flashButton(document.getElementById('d-share'), ok ? 'Copied!' : 'Copy link', 'Copy link');
+  });
+});
+
+/* ------------------------- Share-link loader ------------------------- */
+
+(function loadFromShareParams() {
+  const params = parseShareParams();
+  const tab = params.get('tab');
+  if (!tab) return;
+
+  const tabBtn = document.querySelector(`.wrap > .tabs .tab[data-mode="${tab}"]`);
+  if (tabBtn) tabBtn.click();
+
+  if (tab === 'simple') {
+    if (params.has('c1')) document.getElementById('s-c1').value = params.get('c1');
+    if (params.has('c1u')) document.getElementById('s-c1-unit').value = params.get('c1u');
+    if (params.has('c2')) document.getElementById('s-c2').value = params.get('c2');
+    if (params.has('c2u')) document.getElementById('s-c2-unit').value = params.get('c2u');
+    if (params.has('v2')) document.getElementById('s-v2').value = params.get('v2');
+    if (params.has('v2u')) document.getElementById('s-v2-unit').value = params.get('v2u');
+    if (params.has('mw')) document.getElementById('s-mw').value = params.get('mw');
+    document.getElementById('s-calc').click();
+  } else if (tab === 'serial') {
+    if (params.has('stock')) document.getElementById('d-stock').value = params.get('stock');
+    if (params.has('stocku')) document.getElementById('d-stock-unit').value = params.get('stocku');
+    if (params.has('vol')) document.getElementById('d-volume').value = params.get('vol');
+    if (params.has('volu')) document.getElementById('d-volume-unit').value = params.get('volu');
+    const fmode = params.get('fmode') || 'constant';
+    const modeBtn = document.querySelector(`#d-mode-tabs .tab[data-factormode="${fmode}"]`);
+    if (modeBtn) modeBtn.click();
+    if (fmode === 'constant') {
+      if (params.has('factor')) document.getElementById('d-factor').value = params.get('factor');
+      if (params.has('steps')) document.getElementById('d-steps').value = params.get('steps');
+    } else {
+      if (params.has('factors')) document.getElementById('d-factors').value = params.get('factors');
+    }
+    document.getElementById('d-calc').click();
+  }
+})();
+
+initTheme();
+renderHistory();
+</script>
+</body>
+</html>
